@@ -1,7 +1,8 @@
-; GoogleEarthPhotoTag.ahk  version 1.01
+; GoogleEarthPhotoTag.ahk  version 1.10
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
-; License:  GPL 2+
+; http://code.google.com/p/googleearth-autohotkey/
+; License:  GPLv2+
 ; 
 ; Script for AutoHotkey   ( http://www.autohotkey.com/ )
 ; Creates a GUI for viewing Exif GPS data in JPEG files
@@ -17,13 +18,17 @@
 
 ; TODO
 ; multi-select (del and save)
-; open all - KML
-; read altitude?
+; open all - KML?
+
+; Version history:
+; 1.02   -   read and write Altitude * fix list column sizing
+; 1.01   -   better view-Exif-info popup
+
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.01
+version = 1.10
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -47,7 +52,7 @@ IfEqual exiv2path
 	}
 }
 
-; ---------------- handle command line parameters ("single-photo" = fly to, /SavePos "single-photo"= write coordinates) -------------------
+; ---------------- handle command line parameters ("photo-filename" = fly to, "/SavePos photo-filename" = write coordinates) -------------------
 If 0 > 0
 {
 	If 1 = /SavePos		; use GoogleEarthPhotoTag.exe /SavePos "c:\photos\DSC02083.JPG" to save the current Google Earth coordinates to this photo
@@ -56,18 +61,28 @@ If 0 > 0
 			filename = %2%
 			If FileExist(filename) {
 				SplitPath filename, File, Folder, Ext
-				GetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth)
-				FocusPointLatitude := Round(FocusPointLatitude,6)
-				FocusPointLongitude := Round(FocusPointLongitude,6)
-				If (FocusPointLongitude = "") or (FocusPointLatitude = "") {
+				GetGEpoint(PointLatitude, PointLongitude, PointAltitude)
+				PointLatitude := Round(PointLatitude, 6)
+				PointLongitude := Round(PointLongitude, 6)
+				If (PointAltitude = 0)
+					PointAltitude :=
+				Else
+					PointAltitude := Round(PointAltitude, 1)
+				If (PointLongitude = "") or (PointLatitude = "") {
 					Msgbox,48, Write Coordinates, Error: Failed to get coordinates from Google Earth.
 				} else {
-					SetPhotoLatLong(Folder "\" File, FocusPointLatitude, FocusPointLongitude, exiv2path)
-					GetPhotoLatLong(Folder "\" File, FileLatitude, FileLongitude, exiv2path)
-					If (Dec2Deg(FileLatitude) = Dec2Deg(FocusPointLatitude)) and (Dec2Deg(FileLongitude) = Dec2Deg(FocusPointLongitude)) {    ; cannot compare directly without Dec2Deg() as 41.357892/41.357893 both equal 41° 21' 28.41'' N etc..
-						Msgbox,, Write Coordinates, Coordinates %FocusPointLatitude%`,%FocusPointLongitude% successfully written to %File%
+					SetPhotoLatLongAlt(Folder "\" File, PointLatitude, PointLongitude, PointAltitude, exiv2path)
+					GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)	; read Exif back from photo to make sure write operation succeded
+					If (Dec2Deg(FileLatitude) = Dec2Deg(PointLatitude)) and (Dec2Deg(FileLongitude) = Dec2Deg(PointLongitude) and (PointAltitude = FileAltitude or PointAltitude = "")) {    ; cannot compare directly without Dec2Deg() as 41.357892/41.357893 both equal 41° 21' 28.41'' N etc..
+						IfEqual PointAltitude
+							Msgbox,, Write Coordinates, Coordinates %PointLatitude%`,%PointLongitude% successfully written to %File%
+						Else
+							Msgbox,, Write Coordinates, Coordinates %PointLatitude%`,%PointLongitude% (%PointAltitude%m) successfully written to %File%
 					} else {
-						Msgbox,48, Write Coordinates, Error: Failed to write coordinates %FocusPointLatitude%`,%FocusPointLongitude% to %File%
+						IfEqual PointAltitude
+							Msgbox,48, Write Coordinates, Error: Failed to write coordinates %PointLatitude%`,%PointLongitude% to %File%
+						Else
+							Msgbox,48, Write Coordinates, Error: Failed to write coordinates %PointLatitude%`,%PointLongitude% (%PointAltitude%m) to %File%
 					}
 				}
 			} else {
@@ -80,7 +95,7 @@ If 0 > 0
 		filename = %1%
 		If FileExist(filename) {
 			SplitPath filename, File, Folder, Ext
-			GetPhotoLatLong(Folder "\" File, FileLatitude, FileLongitude, exiv2path)
+			GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)
 			If (FileLatitude = "") or (FileLongitude = "") {
 				Msgbox,48, Read Coordinates, Error: No Exif GPS data in file: %filename% %FileLatitude%, %FileLongitude%
 			} else {
@@ -98,11 +113,12 @@ If 0 > 0
 	ExitApp
 }
 
-FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1
+FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1	; bundle cmdret.dll in executable (avoids temp files when capturing cmdline output) - if opening in GUI mode extract to %temp% and use
 
 ; -------- create right-click menu -------------
-Menu, contex, add, Window On Top, OnTop
-Menu, contex, add, About, About
+Menu, context, add, Always On Top, OnTop
+Menu, context, add,
+Menu, context, add, About, About
 
 ; ----------- create GUI ----------------
 Gui Add, Button, ym xm vAddFiles gAddFiles w74, &Add Files...
@@ -110,17 +126,19 @@ Gui Add, Text, yp+3 xp+77 , (also drag-and-drop)
 Gui Add, Button, yp-3 xp+112 vClear gClear, &Clear List
 Gui Add, Button, yp xp+59 vReread gReread, &Reread Exif
 Gui Add, Text, ym+2 xm+330 , Google Earth coordinates:
-Gui Add, Edit, yp-3 xp+129 w73 +ReadOnly vFocusPointLatitude,
-Gui Add, Edit, yp-0 xp+74  w73 +ReadOnly vFocusPointLongitude,
+Gui Add, Edit, yp-3 xp+129 w73 +ReadOnly vPointLatitude,
+Gui Add, Edit, yp-0 xp+74  w73 +ReadOnly vPointLongitude,
+Gui Add, Edit, yp-0 xp+74  w50 +ReadOnly vPointAltitudeM,
 
-Gui Add, ListView, r11 -Multi xm+0 yp+30 w606 vListView gListView, File|Latitude|Longitude|Log|Folder
+Gui Add, ListView, r11 -Multi xm+0 yp+30 w657 vListView gListView, File|Latitude|Longitude|Altitude|Log|Folder
 LV_ModifyCol(2, "Integer")  ; For sorting purposes, indicate that column is an integer.
 LV_ModifyCol(3, "Integer")
+LV_ModifyCol(4, "Integer")
 
 Gui Add, Button, ym+210 xm+0 vOpenPhoto gOpenPhoto default, &Open photo
 Gui Add, Button, yp xp+76 vShowExif gShowExif, Show &Exif
-Gui Add, Button, yp xp+62 vDeleteExif gDeleteExif, Delete Exif
-Gui Add, Button, yp xp+75 vFlyTo gFlyTo, &Fly to this photo in Google Earth
+Gui Add, Button, yp xp+62 vDeleteExif gDeleteExif, Delete ExifGPS
+Gui Add, Button, yp xp+130 vFlyTo gFlyTo, &Fly to this photo in Google Earth
 Gui Add, Button, yp xp+169 vSavePos gSavePos, &Save Google Earth coordinates to this photo
 Gui Add, Button, yp x0 hidden vreload greload, reloa&d
 
@@ -128,24 +146,44 @@ Gui Font, bold
 Gui Add, Checkbox, yp+30 xm+6 vAutoMode, %A_Space%Auto-Mode 
 Gui font, norm
 Gui Add, text, yp xp+89, (any new files added will automatically be tagged with the current Google Earth coordinates)
-Gui Add, Button, yp-2 xp+471 h18 w40 vAbout gAbout, &?
+Gui Add, Button, yp-2 xp+523 h18 w40 vAbout gAbout, &?
 
 Gui Add, StatusBar
 SB_SetText(" This tool requires exiv2.exe from http://www.exiv2.org/")  ; update statusbar
+LV_ModifyCol(1, 143)  ; Size columns
+LV_ModifyCol(2, 80)
+LV_ModifyCol(3, 80)
+LV_ModifyCol(4, 60)
+LV_ModifyCol(5, 90)
+LV_ModifyCol(6, 200)
 Gui Show, X100 Y700, Google Earth PhotoTag %version%
 Gui +Minsize
 
 ; ------------- continous loop to track Google Earth coordinates -------------
 Loop {
 	If IsGErunning() {
-		GetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth)
-		FocusPointLatitude := Round(FocusPointLatitude,6)
-		FocusPointLongitude := Round(FocusPointLongitude,6)
-		GuiControl,,FocusPointLatitude, %FocusPointLatitude%
-		GuiControl,,FocusPointLongitude, %FocusPointLongitude%
+		oldPointLatitude := PointLatitude	; save old values to only update GUI when there are changes (avoid problem selecting text with the mouse)
+		oldPointLongitude := PointLongitude
+		oldPointAltitude := PointAltitude
+		GetGEpoint(PointLatitude, PointLongitude, PointAltitude)
+		PointLatitude := Round(PointLatitude, 6)
+		PointLongitude := Round(PointLongitude, 6)
+		If (PointAltitude = 0) {
+			PointAltitude :=
+			GuiControl,,PointAltitudeM,
+		} Else {
+			PointAltitude := Round(PointAltitude, 1)
+			If (oldPointAltitude != PointAltitude)
+				GuiControl,,PointAltitudeM, %PointAltitude%m
+		}
+		If (oldPointLatitude != PointLatitude)
+			GuiControl,,PointLatitude, %PointLatitude%
+		If (oldPointLongitude != PointLongitude)
+			GuiControl,,PointLongitude, %PointLongitude%
 	} else {
-		GuiControl,,FocusPointLatitude, not running
-		GuiControl,,FocusPointLongitude,
+		GuiControl,,PointLatitude, not running
+		GuiControl,,PointLongitude,
+		GuiControl,,PointAltitudeM,
 		SB_SetText(" Google Earth is not running.")  ; update statusbar
 	}
 	Sleep 300
@@ -157,14 +195,16 @@ FindFocused:
   File =
   ListLatitude =
   ListLongitude =
+  ListAltitude =
   Folder =
   FocusedRowNumber := LV_GetNext(0, "F")  ; Find the focused row.
-  if not FocusedRowNumber   ; No row is focused.
+  If not FocusedRowNumber   ; No row is focused.
 	return
   LV_GetText(File, FocusedRowNumber, 1)
   LV_GetText(ListLatitude, FocusedRowNumber, 2)
   LV_GetText(ListLongitude, FocusedRowNumber, 3)
-  LV_GetText(Folder, FocusedRowNumber, 5)
+  LV_GetText(ListAltitude, FocusedRowNumber, 4)
+  LV_GetText(Folder, FocusedRowNumber, 6)
 return
 
 ; --------------- add new file to listview (+write GE coordinates if auto-mode checked) ----------
@@ -175,12 +215,12 @@ AddFileToList:
   } else {
 	Gosub ReadExif
   }
-  LV_Add("", File, FileLatitude, FileLongitude, logmsg, Folder)
+  LV_Add("", File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
 return
 
 ; ------------ read Exif GPS data from file ----------------
 ReadExif:
-  GetPhotoLatLong(Folder "\" File, FileLatitude, FileLongitude, exiv2path)
+  GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)
   logmsg := "read Exif failed"
   If (FileLatitude != "") and (FileLongitude != "") 
 	logmsg := "read Exif ok"
@@ -189,11 +229,14 @@ return
 ; ----------- write Exif GPS data to file ---------------
 WriteExif:
   If IsGErunning() {
-	SB_SetText("Writing coordinates " FocusPointLatitude ", " FocusPointLongitude " to file " File )  ; update statusbar
+	IfEqual PointAltitude
+		SB_SetText("Writing coordinates " PointLatitude ", " PointLongitude " to file " File )  ; update statusbar
+	Else
+		SB_SetText("Writing coordinates " PointLatitude ", " PointLongitude " (" PointAltitude "m)" " to file " File )  ; update statusbar
 	logmsg := "write Exif failed"
-	SetPhotoLatLong(Folder "\" File, FocusPointLatitude, FocusPointLongitude, exiv2path)
-	GetPhotoLatLong(Folder "\" File, FileLatitude, FileLongitude, exiv2path)
-	If (Dec2Deg(FileLatitude) = Dec2Deg(FocusPointLatitude)) and (Dec2Deg(FileLongitude) = Dec2Deg(FocusPointLongitude))    ; cannot compare directly without Dec2Deg() as 41.357892/41.357893 both equal 41° 21' 28.41'' N etc..
+	SetPhotoLatLongAlt(Folder "\" File, PointLatitude, PointLongitude, PointAltitude, exiv2path)
+	GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)	; read Exif back from photo to make sure write operation succeded
+	If (Dec2Deg(FileLatitude) = Dec2Deg(PointLatitude)) and (Dec2Deg(FileLongitude) = Dec2Deg(PointLongitude) and (PointAltitude = FileAltitude or PointAltitude = ""))    ; cannot compare directly without Dec2Deg() as 41.357892/41.357893 both equal 41° 21' 28.41'' N etc..
 		logmsg := "write Exif ok"
   }
 return
@@ -213,7 +256,9 @@ AddFiles:
 	}
 	File := A_LoopField
 	Gosub AddFileToList
-	LV_ModifyCol()  ; Auto-size each column to fit its contents.
+	LV_ModifyCol(1)  ; Auto-size column to fit its contents.
+	LV_ModifyCol(6)
+	SB_SetText(A_Index " files added.")  ; update statusbar
   }
 return
 
@@ -228,12 +273,14 @@ Reread:
 	LV_GetText(File, A_Index, 1)
 	LV_GetText(ListLatitude, A_Index, 2)
 	LV_GetText(ListLongitude, A_Index, 3)
-	LV_GetText(Folder, A_Index, 5)
+	LV_GetText(ListAltitude, A_Index, 4)
+	LV_GetText(Folder, A_Index, 6)
 	Gosub ReadExif
-	LV_Modify(A_Index, Col1, File, FileLatitude, FileLongitude, logmsg, Folder)
+	LV_Modify(A_Index, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
 	SB_SetText("Exif data re-read for " A_Index " files.")  ; update statusbar
   }
-  LV_ModifyCol()  ; Auto-size each column to fit its contents.
+  LV_ModifyCol(1)  ; Auto-size column to fit its contents.
+  LV_ModifyCol(6)
 return
 
 OpenPhoto:
@@ -247,7 +294,6 @@ ShowExif:
   IfEqual File
 	return
   GetExif(Folder "\" File, ExifData, exiv2path)
-  ;msgbox, 8192, Exif data for %File%, %ExifData%       ; show all Exif data in standard message-box...ugly
   Gui 3:Destroy
   Gui 3:+Owner
   Gui 1:+Disabled
@@ -267,9 +313,9 @@ DeleteExif:
   ErasePhotoLatLong(Folder "\" File, exiv2path)
   Gosub ReadExif
   logmsg = delete failed
-  If not FileLatitude and not FileLongitude
-	logmsg = delete ok
-  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, logmsg, Folder)
+  If not FileLatitude and not FileLongitude and not FileAltitude
+	logmsg = delete Exif ok
+  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
 return
 
 FlyTo:
@@ -288,7 +334,7 @@ SavePos:
 	  IfEqual File
 		return
 	  Gosub WriteExif
-	  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, logmsg, Folder)
+	  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
   } else {
 	SB_SetText(" Google Earth is not running.")  ; update statusbar
   }
@@ -304,14 +350,16 @@ GuiDropFiles:
 		{
 			SplitPath A_LoopFileFullPath, File, Folder, Ext
 			Gosub AddFileToList
-			LV_ModifyCol()  ; Auto-size each column to fit its contents.
+			LV_ModifyCol(1)  ; Auto-size column to fit its contents.
+			LV_ModifyCol(6)
 			SB_SetText(A_Index " files added.")  ; update statusbar
 		}
 		Loop %A_LoopField%\*.jpeg,,1
 		{
 			SplitPath A_LoopFileFullPath, File, Folder, Ext
 			Gosub AddFileToList
-			LV_ModifyCol()  ; Auto-size each column to fit its contents.
+			LV_ModifyCol(1)  ; Auto-size column to fit its contents.
+			LV_ModifyCol(6)
 			SB_SetText(A_Index " files added.")  ; update statusbar
 		}
 		Continue
@@ -319,7 +367,8 @@ GuiDropFiles:
 	SplitPath A_LoopField, File, Folder, Ext
 	If (Ext = "jpg" or Ext = "jpeg") {
 		Gosub AddFileToList
-		LV_ModifyCol()  ; Auto-size each column to fit its contents.
+		LV_ModifyCol(1)  ; Auto-size column to fit its contents.
+		LV_ModifyCol(6)
 	}
 	SB_SetText(A_Index " files added.")  ; update statusbar
   }
@@ -330,7 +379,7 @@ reload:
 return
 
 OnTop:
-  Menu, contex, ToggleCheck, %A_ThisMenuItem%
+  Menu, context, ToggleCheck, %A_ThisMenuItem%
   Winset, AlwaysOnTop, Toggle, A
 return
 
@@ -340,13 +389,19 @@ ListView:
 return
 
 GuiContextMenu:
-  if A_GuiControl != ListView 
-	Menu, contex, Show
+  if A_GuiControl != ListView 		; don't show right-click menu it click was in listview
+	Menu, context, Show
 return
 
 GuiClose:
   ;FileDelete %A_Temp%\cmdret.dll
 ExitApp
+
+ExifOk:
+3GuiClose:
+  Gui 1:-Disabled
+  Gui 3:Destroy
+return
 
 About:
   Gui 2:Destroy
@@ -357,7 +412,7 @@ About:
   Gui 2:Font
   Gui 2:Add,Text,xm yp+22, A small program for adding Exif GPS data to JPEG files
   Gui 2:Add,Text,xm yp+15, and reading coordinates from the Google Earth client.
-  Gui 2:Add,Text,xm yp+18, License: GPL
+  Gui 2:Add,Text,xm yp+18, License: GPLv2+
   Gui 2:Add,Button,gAssoc x40 yp+26 w200, &Add right-click options to JPEG files
   Gui 2:Add,Text,xm yp+36, Check for updates here:
   Gui 2:Font,CBlue Underline
@@ -371,8 +426,10 @@ About:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gExiv2link yp+15, http://www.exiv2.org/
   Gui 2:Font
-  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-50 x180,&OK
+  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-60 x180,&OK
   Gui 2:Show,,About: Google Earth PhotoTag
+  Gui 2:+LastFound
+  WinSet AlwaysOnTop
 Return
 
 Weblink:
@@ -389,6 +446,7 @@ Return
 
 AboutOk:
 2GuiClose:
+2GuiEscape:
   Gui 1:-Disabled
   Gui 2:Destroy
 return
@@ -406,10 +464,4 @@ Assoc:
   RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite\command , , "%A_ScriptFullPath%" /SavePos "`%1"
   RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite , , Write Google Earth coordinates to file
   MsgBox,, Registry Options, You can now right-click JPEG files to read/save GPS coordinates
-return
-
-ExifOk:
-3GuiClose:
-  Gui 1:-Disabled
-  Gui 3:Destroy
 return
