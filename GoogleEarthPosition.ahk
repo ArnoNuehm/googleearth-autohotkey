@@ -1,7 +1,8 @@
-; GoogleEarthPosition.ahk  version 1.01
+; GoogleEarthPosition.ahk  version 1.02
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
-; License:  GPL 2+
+; http://code.google.com/p/googleearth-autohotkey/
+; License:  GPLv2+
 ; 
 ; Script for AutoHotkey   ( http://www.autohotkey.com/ )
 ; Creates a small GUI for reading the current coordinates from the Google Earth client
@@ -14,20 +15,28 @@
 ; 
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 
+; Version history:
+; 1.02   -   * read Terrain Altitude * add drop-down list for AltitudeMode * DMS coord in statusbar * keyboard shortcuts * fix edit-box text-select in auto-mode * round values option (right-click menu)
+
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.01
+version = 1.02
 
-;Menu, tray, add
-;Menu, tray, add, Window On Top, OnTop
-;Menu, tray, Check, Window On Top
+Speed := 1.0
+RoundVal := 1
 
-Menu, contex, add, Window On Top, OnTop
-Menu, contex, Check, Window On Top
-Menu, contex, add, About, About
+; -------- create right-click menu -------------
+Menu, context, add, Always On Top, OnTop
+Menu, context, Check, Always On Top
+Menu, context, add, Round values, RoundVal
+If RoundVal
+	Menu, context, Check, Round values
+Menu, context, add,
+Menu, context, add, About, About
 
+; ----------- create GUI ----------------
 Gui, Add, Text, x10, FocusPointLatitude:
 Gui, Add, Edit, yp x140 w150 vFocusPointLatitude,
 Gui, Add, Text, x10, FocusPointLongitude:
@@ -35,28 +44,37 @@ Gui, Add, Edit, yp x140 w150 vFocusPointLongitude,
 Gui, Add, Text, x10, FocusPointAltitude:
 Gui, Add, Edit, yp x140 w150 vFocusPointAltitude,
 Gui, Add, Text, x10, FocusPointAltitudeMode:
-Gui, Add, Edit, yp x140 w150 vFocusPointAltitudeMode,
+Gui, Add, DropDownList, yp x140 w150 AltSubmit Choose1 vFocusPointAltitudeMode, Relative To Ground|Absolute
 Gui, Add, Text, x10, Range:
 Gui, Add, Edit, yp x140 w150 vRange,
 Gui, Add, Text, x10, Tilt:
 Gui, Add, Edit, yp x140 w150 vTilt,
 Gui, Add, Text, x10, Azimuth:
 Gui, Add, Edit, yp x140 w150 vAzimuth,
-Gui, Add, Button, x10 w70, GetPos
-Gui, Add, Checkbox, yp x85 vAutoLoad Checked,(auto)
-Gui, Add, Button, yp x140 w70 default, FlyTo
+Gui, Add, Text, x10, Terrain Altitude:
+Gui, Add, Edit, yp x140 w150 vAltitude ReadOnly,
+
+Gui, Add, Button, x10 w70, &GetPos
+Gui, Add, Checkbox, yp x85 vAutoLoad Checked,(au&to)
+Gui, Add, Button, yp x140 w70 default, &FlyTo
 Gui, Add, Text, yp x227, speed:
-Gui, Add, Edit, yp x263 w27 vSpeed,
-;Gui, Add, Text, x10, CSV:
-Gui, Add, Button, x10 w120 ,Copy_LatLong
-Gui, Add, Button, yp x140 w120 ,Copy_LookAt
-;Gui, Add, Text, x10, KML:
-Gui, Add, Button, x10 w120 ,Copy_LatLong_KML
-Gui, Add, Button, yp x140 w120 ,Copy_LookAt_KML
+Gui, Add, Edit, yp x263 w27 vSpeed, %Speed%
+Gui, Add, Button, x10 w120 gButtonCopy_LatLong,&Copy LatLong
+Gui, Add, Button, yp x140 w120 gButtonCopy_LookAt,Copy Look&At
+Gui, Add, Button, x10 w120 gButtonCopy_LatLong_KML,Copy LatLong K&ML
+Gui, Add, Button, yp x140 w120 gButtonCopy_LookAt_KML,Copy LookAt KM&L
+
+;Gui, Add, Text, x10, DMS Coordinates:
+;Gui, Add, Edit, x10 w100 ReadOnly, %A_Space%DMS Coordinates:
+;Gui, Add, Edit, yp x110 w180 vDMSCoord ReadOnly,
+
+Gui Add, StatusBar
+SB_SetText("  Google Earth is not running ")
+
+
 Gui, Show,, Google Earth Position %version%
 Gui +LastFound
 WinSet AlwaysOnTop
-Speed := 1.0
 Gosub ButtonGetPos
 
 Loop {
@@ -69,20 +87,22 @@ Loop {
 		  GuiControl, +ReadOnly, FocusPointLatitude,
 		  GuiControl, +ReadOnly, FocusPointLongitude,
 		  GuiControl, +ReadOnly, FocusPointAltitude,
-		  GuiControl, +ReadOnly, FocusPointAltitudeMode,
+		  GuiControl, +Disabled, FocusPointAltitudeMode,
 		  GuiControl, +ReadOnly, Range,
 		  GuiControl, +ReadOnly, Tilt,
 		  GuiControl, +ReadOnly, Azimuth,
 		  GuiControl, +ReadOnly, Speed,
+		  GuiControl, -Disabled, Altitude,
 	  } else {
 		  GuiControl, -ReadOnly, FocusPointLatitude,
 		  GuiControl, -ReadOnly, FocusPointLongitude,
 		  GuiControl, -ReadOnly, FocusPointAltitude,
-		  GuiControl, -ReadOnly, FocusPointAltitudeMode,
+		  GuiControl, -Disabled, FocusPointAltitudeMode,
 		  GuiControl, -ReadOnly, Range,
 		  GuiControl, -ReadOnly, Tilt,
 		  GuiControl, -ReadOnly, Azimuth,
 		  GuiControl, -ReadOnly, Speed,
+		  GuiControl, +Disabled, Altitude,
 	  }
   }
   PrevAutoLoad := AutoLoad
@@ -92,14 +112,46 @@ Loop {
 ButtonGetPos:
   If not IsGErunning()
 	return
-  GetGEpos(FocusPointLatitude,FocusPointLongitude,FocusPointAltitude,FocusPointAltitudeMode,Range,Tilt,Azimuth)
-  GuiControl,, FocusPointLatitude, %FocusPointLatitude%
-  GuiControl,, FocusPointLongitude, %FocusPointLongitude%
-  GuiControl,, FocusPointAltitude, %FocusPointAltitude%
-  GuiControl,, FocusPointAltitudeMode, %FocusPointAltitudeMode%
-  GuiControl,, Range, %Range%
-  GuiControl,, Tilt, %Tilt%
-  GuiControl,, Azimuth, %Azimuth%
+  oldFocusPointLatitude := FocusPointLatitude
+  oldFocusPointLongitude := FocusPointLongitude
+  oldFocusPointAltitude := FocusPointAltitude
+  oldFocusPointAltitudeMode := FocusPointAltitudeMode
+  oldRange := Range
+  oldTilt := Tilt
+  oldAzimuth := Azimuth
+  oldPointAltitude := PointAltitude
+  oldDMSCoord := DMSCoord
+  GetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth)
+  GetGEpoint(PointLatitude, PointLongitude, PointAltitude)
+  If (RoundVal) {
+	FocusPointLatitude := Round(FocusPointLatitude,6)
+	FocusPointLongitude := Round(FocusPointLongitude,6)
+	;FocusPointAltitude := Round(FocusPointAltitude,2)
+	Range := Round(Range,2)
+	Tilt := Round(Tilt,2)
+	Azimuth := Round(Azimuth,2)
+	PointAltitude := Round(PointAltitude,2)
+  }
+  DMSCoord := Dec2Deg(FocusPointLatitude "," FocusPointLongitude)
+  If (FocusPointLatitude != oldFocusPointLatitude)
+	GuiControl,, FocusPointLatitude, %FocusPointLatitude%
+  If (FocusPointLongitude != oldFocusPointLongitude)
+	GuiControl,, FocusPointLongitude, %FocusPointLongitude%
+  If (FocusPointAltitude != oldFocusPointAltitude)
+	GuiControl,, FocusPointAltitude, %FocusPointAltitude%
+  If (FocusPointAltitudeMode != oldFocusPointAltitudeMode)
+	GuiControl, Choose, FocusPointAltitudeMode, %FocusPointAltitudeMode%
+  If (Range != oldRange)
+	GuiControl,, Range, %Range%
+  If (Tilt != oldTilt)
+	GuiControl,, Tilt, %Tilt%
+  If (Azimuth != oldAzimuth)
+	GuiControl,, Azimuth, %Azimuth%
+  If (PointAltitude != oldPointAltitude)
+	GuiControl,, Altitude, %PointAltitude%
+  If (DMSCoord != oldDMSCoord)
+	SB_SetText("   DMS Coordinates:   " DMSCoord)
+	;GuiControl,, DMSCoord, %DMSCoord%
   GuiControl,, Speed, %Speed%
 return
 
@@ -128,13 +180,17 @@ ButtonCopy_LatLongIni:
 return
 
 OnTop:
-  ;Menu, tray, ToggleCheck, %A_ThisMenuItem%
-  Menu, contex, ToggleCheck, %A_ThisMenuItem%
+  Menu, context, ToggleCheck, %A_ThisMenuItem%
   Winset, AlwaysOnTop, Toggle, A
 return
 
+RoundVal:
+  Menu, context, ToggleCheck, %A_ThisMenuItem%
+  RoundVal := (RoundVal - 1)**2	; toggle value 1/0
+return
+
 GuiContextMenu:
-  Menu, contex, Show
+  Menu, context, Show
 return
 
 GuiClose:
@@ -150,9 +206,9 @@ About:
   Gui 2:Font
   Gui 2:Add,Text,xm yp+22, A tiny program for reading coordinates from the Google Earth client
   Gui 2:Add,Text,xm yp+15, (or edit coordinates to make Google Earth fly to a new location).
-  Gui 2:Add,Text,xm yp+18, License: GPL
-  Gui 2:Add,Text,xm yp+36, The copy functions might be useful when editing KML with
-  Gui 2:Add,Text,xm yp+15, Google's SpreadSheet Mapper:
+  Gui 2:Add,Text,xm yp+18, License: GPLv2+
+  Gui 2:Add,Text,xm yp+36, The copy functions are intended to be useful when editing KML
+  Gui 2:Add,Text,xm yp+15, using Google's SpreadSheet Mapper:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gMapperlink yp+15, http://earth.google.com/outreach/tutorial_mapper.html
   Gui 2:Font
@@ -164,30 +220,26 @@ About:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gEmaillink yp+15, davidtryse@gmail.com
   Gui 2:Font
-  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-50 x230,&OK
+  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-60 x230,&OK
   Gui 2:Show,,About: Google Earth Position
   Gui 2:+LastFound
   WinSet AlwaysOnTop
 Return
 
-AboutOk:
-  Gui 1:-Disabled
-  Gui 2:Destroy
-return
-
 Weblink:
-Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+  Run, http://david.tryse.net/googleearth/,,UseErrorLevel
 Return
 
 Mapperlink:
-Run, http://earth.google.com/outreach/tutorial_mapper.html,,UseErrorLevel
+  Run, http://earth.google.com/outreach/tutorial_mapper.html,,UseErrorLevel
 Return
 
 Emaillink:
-Run, mailto:davidtryse@gmail.com,,UseErrorLevel
+  Run, mailto:davidtryse@gmail.com,,UseErrorLevel
 Return
 
+AboutOk:
 2GuiClose:
-Gui 1:-Disabled
-Gui 2:Destroy
+  Gui 1:-Disabled
+  Gui 2:Destroy
 return
