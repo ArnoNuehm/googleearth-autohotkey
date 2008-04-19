@@ -16,13 +16,14 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 
 ; Version history:
-; 1.02   -   * read Terrain Altitude * add drop-down list for AltitudeMode * DMS coord in statusbar * keyboard shortcuts * fix edit-box text-select in auto-mode * round values option (right-click menu)
+; 1.03   -   * add six mini-bookmarks * add tooltips *
+; 1.02   -   * read Terrain Altitude * add drop-down list for AltitudeMode * DMS coord in statusbar * keyboard shortcuts * fix edit-box text-select in auto-mode * round values option (right-click menu) *
 
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.02
+version = 1.03
 
 Speed := 1.0
 RoundVal := 1
@@ -54,33 +55,48 @@ Gui, Add, Edit, yp x140 w150 vAzimuth,
 Gui, Add, Text, x10, Terrain Altitude:
 Gui, Add, Edit, yp x140 w150 vAltitude ReadOnly,
 
-Gui, Add, Button, x10 w70, &GetPos
-Gui, Add, Checkbox, yp x85 vAutoLoad Checked,(au&to)
-Gui, Add, Button, yp x140 w70 default, &FlyTo
-Gui, Add, Text, yp x227, speed:
-Gui, Add, Edit, yp x263 w27 vSpeed, %Speed%
-Gui, Add, Button, x10 w120 gButtonCopy_LatLong,&Copy LatLong
-Gui, Add, Button, yp x140 w120 gButtonCopy_LookAt,Copy Look&At
-Gui, Add, Button, x10 w120 gButtonCopy_LatLong_KML,Copy LatLong K&ML
-Gui, Add, Button, yp x140 w120 gButtonCopy_LookAt_KML,Copy LookAt KM&L
+Gui, Add, Button, x10 w70 gGetPos vGetPos, &GetPos
+Gui, Add, Checkbox, yp h24 x85 vAutoLoad Checked, Au&to
+AutoLoad_TT := "Uncheck this box to edit coordinates and fly Google Earth to a new location."
+Gui, Add, Button, yp x140 w70 default gFlyTo vFlyTo, &FlyTo
+Gui, Add, Text, yp+3 x227, speed:
+Gui, Add, Edit, yp-3 x263 w27 vSpeed, %Speed%
+Gui, Add, Button, x10 w120 gCopy_LatLong vCopy_LatLong, &Copy LatLong
+Gui, Add, Button, yp x140 w120 gCopy_LookAt vCopy_LookAt, Copy Look&At
+Gui, Add, Button, x10 w120 gCopy_LatLong_KML vCopy_LatLong_KML, Copy LatLong K&ML
+Gui, Add, Button, yp x140 w120 gCopy_LookAt_KML vCopy_LookAt_KML, Copy LookAt KM&L
+Gui Add, Button, yp x0 hidden greload, reloa&d
+
+Gui, Add, Button, yp+35 x10 w40 h20 gSavePos vSavedPos1, 1
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos2, 2
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos3, 3
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos4, 4
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos5, 5
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos6, 6
+SavedPos1_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
+SavedPos2_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
+SavedPos3_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
+SavedPos4_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
+SavedPos5_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
+SavedPos6_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
 
 ;Gui, Add, Text, x10, DMS Coordinates:
 ;Gui, Add, Edit, x10 w100 ReadOnly, %A_Space%DMS Coordinates:
 ;Gui, Add, Edit, yp x110 w180 vDMSCoord ReadOnly,
 
-Gui Add, StatusBar
+Gui Add, StatusBar, vStatusBar
 SB_SetText("  Google Earth is not running ")
 
 
 Gui, Show,, Google Earth Position %version%
 Gui +LastFound
 WinSet AlwaysOnTop
-Gosub ButtonGetPos
+OnMessage(0x200, "WM_MOUSEMOVE")
 
 Loop {
   Gui, Submit, NoHide
   If (AutoLoad = "1")
-	Gosub ButtonGetPos
+	Gosub GetPos
   If (AutoLoad != PrevAutoLoad)  {
 	  If (AutoLoad = "1") 
 	  {
@@ -93,6 +109,8 @@ Loop {
 		  GuiControl, +ReadOnly, Azimuth,
 		  GuiControl, +ReadOnly, Speed,
 		  GuiControl, -Disabled, Altitude,
+		  GuiControl, +Disabled, FlyTo,
+		  GuiControl, +Disabled, GetPos,
 	  } else {
 		  GuiControl, -ReadOnly, FocusPointLatitude,
 		  GuiControl, -ReadOnly, FocusPointLongitude,
@@ -103,13 +121,15 @@ Loop {
 		  GuiControl, -ReadOnly, Azimuth,
 		  GuiControl, -ReadOnly, Speed,
 		  GuiControl, +Disabled, Altitude,
+		  GuiControl, -Disabled, FlyTo,
+		  GuiControl, -Disabled, GetPos,
 	  }
   }
   PrevAutoLoad := AutoLoad
-  Sleep 100
+  Sleep 200
 }
 
-ButtonGetPos:
+GetPos:
   If not IsGErunning()
 	return
   oldFocusPointLatitude := FocusPointLatitude
@@ -155,28 +175,95 @@ ButtonGetPos:
   GuiControl,, Speed, %Speed%
 return
 
-ButtonFlyTo:
+FlyTo:
   SetGEpos(FocusPointLatitude,FocusPointLongitude,FocusPointAltitude,FocusPointAltitudeMode,Range,Tilt,Azimuth,Speed)
 return
 
-ButtonCopy_LatLong:
+Copy_LatLong:
   clipboard = %FocusPointLatitude%`t%FocusPointLongitude%
 return
 
-ButtonCopy_LookAt:
+Copy_LookAt:
   clipboard = %FocusPointLatitude%`t%FocusPointLongitude%`t%FocusPointAltitude%`t%Range%`t%Tilt%`t%Azimuth%
 return
 
-ButtonCopy_LatLong_KML:
+Copy_LatLong_KML:
   clipboard = <coordinates>%FocusPointLongitude%,%FocusPointLatitude%,0</coordinates>
 return
 
-ButtonCopy_LookAt_KML:
+Copy_LookAt_KML:
   clipboard = <LookAt>`n`t<longitude>%FocusPointLongitude%</longitude>`n`t<latitude>%FocusPointLatitude%</latitude>`n`t<altitude>%FocusPointAltitude%</altitude>`n`t<range>%Range%</range>`n`t<tilt>%Tilt%</tilt>`n`t<heading>%Azimuth%</heading>`n</LookAt>
 return
 
-ButtonCopy_LatLongIni:
-  clipboard = lat = %FocusPointLatitude%`nlong = %FocusPointLongitude%
+SavePos:
+  GetKeyState, shiftstate, Shift
+  GetKeyState, altstate, Alt
+  If (shiftstate = "D" and altstate = "U") {
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLatitude, %FocusPointLatitude%
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLongitude, %FocusPointLongitude%
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitude, %FocusPointAltitude%
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitudeMode, %FocusPointAltitudeMode%
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Range, %Range%
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Tilt, %Tilt%
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Azimuth, %Azimuth%
+	SB_SetText("  Saved coordinates. ")
+  } else if (shiftstate = "U") {
+	RegRead, FocusPointLatitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLatitude
+	If !(FocusPointLatitude) {
+		SB_SetText(" No previously saved coordinates. Use Shift and click to save. ")
+		return
+	}	
+	RegRead, FocusPointLongitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLongitude
+	RegRead, FocusPointAltitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitude
+	RegRead, FocusPointAltitudeMode, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitudeMode
+	RegRead, Range, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Range
+	RegRead, Tilt, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Tilt
+	RegRead, Azimuth, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Azimuth
+	If (altstate = "U")
+		Gosub, FlyTo
+	If (altstate = "D") {
+		GuiControl,, AutoLoad, 0
+		GuiControl,, FocusPointLatitude, %FocusPointLatitude%
+		GuiControl,, FocusPointLongitude, %FocusPointLongitude%
+		GuiControl,, FocusPointAltitude, %FocusPointAltitude%
+		GuiControl, Choose, FocusPointAltitudeMode, %FocusPointAltitudeMode%
+		GuiControl,, Range, %Range%
+		GuiControl,, Tilt, %Tilt%
+		GuiControl,, Azimuth, %Azimuth%
+		GuiControl,, Altitude, %PointAltitude%
+		SB_SetText("   DMS Coordinates:   " DMSCoord)
+	}
+  }
+return
+
+
+WM_MOUSEMOVE()
+{
+    static CurrControl, PrevControl, _TT  ; _TT is kept blank for use by the ToolTip command below.
+    CurrControl := A_GuiControl
+    If (CurrControl <> PrevControl and not InStr(CurrControl, " "))
+    {
+        ToolTip  ; Turn off any previous tooltip.
+        SetTimer, DisplayToolTip, 1000
+        PrevControl := CurrControl
+    }
+    return
+
+    DisplayToolTip:
+    SetTimer, DisplayToolTip, Off
+    If !(RegExReplace(CurrControl,"[a-zA-Z0-9_]"))	; check to only do next line if CurrControl is a well formed variable name, to avoid errors.
+	ToolTip % %CurrControl%_TT  ; The leading percent sign tell it to use an expression.
+    SetTimer, RemoveToolTip, 5000
+    return
+
+    RemoveToolTip:
+    SetTimer, RemoveToolTip, Off
+    ToolTip
+    return
+}
+
+reload:
+  Reload
 return
 
 OnTop:
@@ -240,6 +327,7 @@ Return
 
 AboutOk:
 2GuiClose:
+2GuiEscape:
   Gui 1:-Disabled
   Gui 2:Destroy
 return
