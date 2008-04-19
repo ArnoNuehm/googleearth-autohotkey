@@ -1,6 +1,7 @@
-; LatLongConversion.ahk  version 1.02
+; LatLongConversion.ahk  version 1.03
 ; by David Tryse   davidtryse@gmail.com
-; http://david.tryse.net/googleearth/	http://code.google.com/p/googleearth-autohotkey/
+; http://david.tryse.net/googleearth/
+; http://code.google.com/p/googleearth-autohotkey/
 ; License:  GPLv2+
 ; 
 ; Script for AutoHotkey   ( http://www.autohotkey.com/ )
@@ -18,9 +19,12 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.02
+version = 1.03
 
-Menu, contex, add, About, About
+; -------- create right-click menu -------------
+Menu, context, add, Always On Top, OnTop
+Menu, context, add,
+Menu, context, add, About, About
 
 Gui, Font, bold
 Gui, Add, Text, y5 x5, Degrees
@@ -80,8 +84,13 @@ ButtonCopy_Decimal:
   clipboard := Decimal
 return
 
+OnTop:
+  Menu, context, ToggleCheck, %A_ThisMenuItem%
+  Winset, AlwaysOnTop, Toggle, A
+return
+
 GuiContextMenu:
-  Menu, contex, Show
+  Menu, context, Show
 return
 
 GuiClose:
@@ -118,6 +127,8 @@ About:
   Gui 2:Font
   Gui 2:Add,Button,gAboutOk Default w80 h80 yp-60 x200,&OK
   Gui 2:Show,,About: LatLong Conversion
+  Gui 2:+LastFound
+  WinSet AlwaysOnTop
 Return
 
 Weblink:
@@ -130,6 +141,7 @@ Return
 
 AboutOk:
 2GuiClose:
+2GuiEscape:
   Gui 1:-Disabled
   Gui 2:Destroy
 return
