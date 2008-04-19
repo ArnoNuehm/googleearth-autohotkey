@@ -1,4 +1,4 @@
-; GoogleEarthPhotoTag.ahk  version 1.00
+; GoogleEarthPhotoTag.ahk  version 1.01
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; License:  GPL 2+
@@ -23,7 +23,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.00
+version = 1.01
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -122,7 +122,7 @@ Gui Add, Button, yp xp+76 vShowExif gShowExif, Show &Exif
 Gui Add, Button, yp xp+62 vDeleteExif gDeleteExif, Delete Exif
 Gui Add, Button, yp xp+75 vFlyTo gFlyTo, &Fly to this photo in Google Earth
 Gui Add, Button, yp xp+169 vSavePos gSavePos, &Save Google Earth coordinates to this photo
-;Gui Add, Button, yp x0 hidden vreload greload, reloa&d
+Gui Add, Button, yp x0 hidden vreload greload, reloa&d
 
 Gui Font, bold
 Gui Add, Checkbox, yp+30 xm+6 vAutoMode, %A_Space%Auto-Mode 
@@ -247,7 +247,16 @@ ShowExif:
   IfEqual File
 	return
   GetExif(Folder "\" File, ExifData, exiv2path)
-  msgbox, 8192, Exif data for %File%, %ExifData%       ; show all Exif data in standard message-box...ugly
+  ;msgbox, 8192, Exif data for %File%, %ExifData%       ; show all Exif data in standard message-box...ugly
+  Gui 3:Destroy
+  Gui 3:+Owner
+  Gui 1:+Disabled
+  Gui 3: Add, Button, gExifOk Default w300 h20 ym+350 xm+100, OK
+  Gui 3: Font,, Lucida Console
+  Gui 3: Add, Edit, t64 vExifEditfield +ReadOnly -Wrap -WantReturn W500 R30 xm ym
+  Gui 3: Font
+  GuiControl 3:, ExifEditfield, %ExifData%  ; Put the text into the control.
+  Gui 3: Show,, Exif data for %File%
 return
 
 DeleteExif:
@@ -366,26 +375,22 @@ About:
   Gui 2:Show,,About: Google Earth PhotoTag
 Return
 
-AboutOk:
-  Gui 1:-Disabled
-  Gui 2:Destroy
-return
-
 Weblink:
-Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+  Run, http://david.tryse.net/googleearth/,,UseErrorLevel
 Return
 
 Emaillink:
-Run, mailto:davidtryse@gmail.com,,UseErrorLevel
+  Run, mailto:davidtryse@gmail.com,,UseErrorLevel
 Return
 
 Exiv2link:
-Run, http://www.exiv2.org/,,UseErrorLevel
+  Run, http://www.exiv2.org/,,UseErrorLevel
 Return
 
+AboutOk:
 2GuiClose:
-Gui 1:-Disabled
-Gui 2:Destroy
+  Gui 1:-Disabled
+  Gui 2:Destroy
 return
 
 Assoc:
@@ -401,4 +406,10 @@ Assoc:
   RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite\command , , "%A_ScriptFullPath%" /SavePos "`%1"
   RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite , , Write Google Earth coordinates to file
   MsgBox,, Registry Options, You can now right-click JPEG files to read/save GPS coordinates
+return
+
+ExifOk:
+3GuiClose:
+  Gui 1:-Disabled
+  Gui 3:Destroy
 return
