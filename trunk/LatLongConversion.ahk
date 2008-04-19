@@ -1,7 +1,7 @@
-; LatLongConversion.ahk  version 1.01
+; LatLongConversion.ahk  version 1.02
 ; by David Tryse   davidtryse@gmail.com
-; http://david.tryse.net/googleearth/
-; License:  GPL 2+
+; http://david.tryse.net/googleearth/	http://code.google.com/p/googleearth-autohotkey/
+; License:  GPLv2+
 ; 
 ; Script for AutoHotkey   ( http://www.autohotkey.com/ )
 ; Creates a GUI for converting between Degree Minute Second and Decimal format coordinates
@@ -18,7 +18,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.01
+version = 1.02
 
 Menu, contex, add, About, About
 
@@ -85,7 +85,7 @@ GuiContextMenu:
 return
 
 GuiClose:
-WS_Uninitialize()
+  WS_Uninitialize()
 ExitApp
 
 About:
@@ -107,7 +107,7 @@ About:
   Gui 2:Add,Text,xm+20 yp+15, 8 deg 32' 54.73" South	119 deg 29' 28.98" East
   Gui 2:Add,Text,xm+20 yp+15, 8°32'54.73"S, 119°29'28.98"E
   Gui 2:Font
-  Gui 2:Add,Text,xm yp+22, License: GPL
+  Gui 2:Add,Text,xm yp+22, License: GPLv2+
   Gui 2:Add,Text,xm yp+36, Check for updates here:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gWeblink yp+15, http://david.tryse.net/googleearth/
@@ -116,24 +116,20 @@ About:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gEmaillink yp+15, davidtryse@gmail.com
   Gui 2:Font
-  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-50 x200,&OK
+  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-60 x200,&OK
   Gui 2:Show,,About: LatLong Conversion
 Return
 
-AboutOk:
-  Gui 1:-Disabled
-  Gui 2:Destroy
-return
-
 Weblink:
-Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+  Run, http://david.tryse.net/googleearth/,,UseErrorLevel
 Return
 
 Emaillink:
-Run, mailto:davidtryse@gmail.com,,UseErrorLevel
+  Run, mailto:davidtryse@gmail.com,,UseErrorLevel
 Return
 
+AboutOk:
 2GuiClose:
-Gui 1:-Disabled
-Gui 2:Destroy
+  Gui 1:-Disabled
+  Gui 2:Destroy
 return
