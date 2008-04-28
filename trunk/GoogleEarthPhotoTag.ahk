@@ -1,4 +1,4 @@
-; GoogleEarthPhotoTag.ahk  version 1.10
+; GoogleEarthPhotoTag.ahk  version 1.11
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -21,14 +21,15 @@
 ; open all - KML?
 
 ; Version history:
-; 1.02   -   read and write Altitude * fix list column sizing
+; 1.11   -   add photo preview and Exif info tabs
+; 1.10   -   read and write Altitude * fix list column sizing
 ; 1.01   -   better view-Exif-info popup
 
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.10
+version = 1.11
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -121,43 +122,52 @@ Menu, context, add,
 Menu, context, add, About, About
 
 ; ----------- create GUI ----------------
-Gui Add, Button, ym xm vAddFiles gAddFiles w74, &Add Files...
-Gui Add, Text, yp+3 xp+77 , (also drag-and-drop)
-Gui Add, Button, yp-3 xp+112 vClear gClear, &Clear List
-Gui Add, Button, yp xp+59 vReread gReread, &Reread Exif
-Gui Add, Text, ym+2 xm+330 , Google Earth coordinates:
-Gui Add, Edit, yp-3 xp+129 w73 +ReadOnly vPointLatitude,
-Gui Add, Edit, yp-0 xp+74  w73 +ReadOnly vPointLongitude,
-Gui Add, Edit, yp-0 xp+74  w50 +ReadOnly vPointAltitudeM,
+Gui, Add, Button, ym xm vAddFiles gAddFiles w74, &Add Files...
+Gui, Add, Text, yp+3 xp+77 , (also drag-and-drop)
+Gui, Add, Button, yp-3 xp+108 vClear gClear, &Clear List
+Gui, Add, Button, yp xp+59 vReread gReread, &Reread Exif
+Gui, Add, Text, ym+2 xm+324 , Google Earth coordinates:
+Gui, Add, Edit, yp-2 xp+128 w73 +ReadOnly vPointLatitude,
+Gui, Add, Edit, yp-0 xp+74  w73 +ReadOnly vPointLongitude,
+Gui, Add, Edit, yp-0 xp+74  w50 +ReadOnly vPointAltitudeM,
 
-Gui Add, ListView, r11 -Multi xm+0 yp+30 w657 vListView gListView, File|Latitude|Longitude|Altitude|Log|Folder
+Gui, Add, ListView, r11 -Multi xm+0 yp+30 w650 AltSubmit vListView gListView, File|Latitude|Longitude|Altitude|Log|Folder
 LV_ModifyCol(2, "Integer")  ; For sorting purposes, indicate that column is an integer.
 LV_ModifyCol(3, "Integer")
 LV_ModifyCol(4, "Integer")
 
-Gui Add, Button, ym+210 xm+0 vOpenPhoto gOpenPhoto default, &Open photo
-Gui Add, Button, yp xp+76 vShowExif gShowExif, Show &Exif
-Gui Add, Button, yp xp+62 vDeleteExif gDeleteExif, Delete ExifGPS
-Gui Add, Button, yp xp+130 vFlyTo gFlyTo, &Fly to this photo in Google Earth
-Gui Add, Button, yp xp+169 vSavePos gSavePos, &Save Google Earth coordinates to this photo
-Gui Add, Button, yp x0 hidden vreload greload, reloa&d
+Gui, Add, Button, ym+210 xm+0 vOpenPhoto gOpenPhoto default, &Open photo
+Gui, Add, Button, yp xp+76 vShowExif gShowExif, Show &Exif
+Gui, Add, Button, yp xp+62 vDeleteExif gDeleteExif, Delete ExifGPS
+Gui, Add, Button, yp xp+124 vFlyTo gFlyTo, &Fly to this photo in Google Earth
+Gui, Add, Button, yp xp+167 vSavePos gSavePos, &Save Google Earth coordinates to this photo
+Gui, Add, Button, yp x0 hidden vreload greload, reloa&d
 
-Gui Font, bold
-Gui Add, Checkbox, yp+30 xm+6 vAutoMode, %A_Space%Auto-Mode 
-Gui font, norm
-Gui Add, text, yp xp+89, (any new files added will automatically be tagged with the current Google Earth coordinates)
-Gui Add, Button, yp-2 xp+523 h18 w40 vAbout gAbout, &?
+Gui, Font, bold
+Gui, Add, Checkbox, yp+30 xm+6 vAutoMode, %A_Space%Auto-Mode 
+Gui, font, norm
+Gui, Add, text, yp xp+89, (any new files added will automatically be tagged with the current Google Earth coordinates)
+Gui, Add, Button, yp-2 xp+470 h18 w40 vAbout gAbout, &?
+Gui, Add, Button, yp xp+45 h18 w40 vExpandGui gExpandGui, &>>
 
-Gui Add, StatusBar
+Gui, Add, Tab2,w340 h256 xm+658 ym, Show Photo|Show Exif
+;Gui, Add, Picture, w340 h227 xm+658 ym+29 vPhotoView,
+Gui, Add, Picture, w327 h218 xm+664 ym+29 vPhotoView,
+Gui, Tab, 2
+Gui, Add, Edit, t64 vExifEditfield +ReadOnly -Wrap -WantReturn w327 h218 xm+664 ym+29 
+Gui, Tab
+
+Gui, Add, StatusBar
 SB_SetText(" This tool requires exiv2.exe from http://www.exiv2.org/")  ; update statusbar
 LV_ModifyCol(1, 143)  ; Size columns
 LV_ModifyCol(2, 80)
 LV_ModifyCol(3, 80)
 LV_ModifyCol(4, 60)
 LV_ModifyCol(5, 90)
-LV_ModifyCol(6, 200)
-Gui Show, X100 Y700, Google Earth PhotoTag %version%
-Gui +Minsize
+LV_ModifyCol(6, 193)
+;Gui, Show, w1018, Google Earth PhotoTag %version%
+Gui Show, w668, Google Earth PhotoTag %version%
+GuiExpanded = 0
 
 ; ------------- continous loop to track Google Earth coordinates -------------
 Loop {
@@ -184,8 +194,22 @@ Loop {
 		GuiControl,,PointLatitude, not running
 		GuiControl,,PointLongitude,
 		GuiControl,,PointAltitudeM,
-		SB_SetText(" Google Earth is not running.")  ; update statusbar
+		SB_SetText(" Google Earth is not running.")	; update statusbar
 	}
+	FocusedRowNumber := LV_GetNext(0, "F")
+	If (FocusedRowNumber != OldFocusedRowNumber) {
+		ExtGuiNeedUpdate = 1
+		if (not ExtGuiHasBeenOpened and FocusedRowNumber) {
+			If (not GuiExpanded)
+				Gosub ExpandGui				; open the view-photo tab if first time a file has been selected
+		}
+	} else if (ExtGuiNeedUpdate = 1) and (GuiExpanded = 1) {
+		Gosub FindFocused
+		Gosub UpdatePhotoView
+		Gosub UpdateExifView
+		ExtGuiNeedUpdate = 0
+	}
+	OldFocusedRowNumber := FocusedRowNumber
 	Sleep 300
 }
 
@@ -265,6 +289,8 @@ return
 Clear:
   LV_Delete() ; delete all rows in listview
   SB_SetText("Clear...")  ; update statusbar
+  If (GuiExpanded)
+	Gosub ExpandGui
 return
 
 Reread:
@@ -384,8 +410,45 @@ OnTop:
 return
 
 ListView:
-  If A_GuiEvent = DoubleClick
+  ;SB_SetText(A_GuiEvent " : " Folder "\" File) ;; xxxxxx
+  If (A_GuiEvent = "DoubleClick") {
 	Gosub OpenPhoto
+  } else If (A_GuiEvent = "Normal") {
+	; single-click actions here...
+  }
+return
+
+UpdatePhotoView:
+  If(File) {
+	GuiControl,, PhotoView, *w-1 *h218 %Folder%\%File%
+  } else {
+	GuiControl,, PhotoView,	; empty control
+  }
+return
+
+UpdateExifView:
+  If(File) {
+	GetExif(Folder "\" File, ExifData, exiv2path)
+	GuiControl,, ExifEditfield, Filename:  %File%  (%Folder%)`n==================================================`n%ExifData%  ; Put the text into the control.
+  } else {
+	GuiControl,, ExifEditfield,	; empty control
+  }
+return
+
+ExpandGui:
+  If (GuiExpanded) {
+	Gui Show, w668, Google Earth PhotoTag %version%
+	GuiControl, Text, ExpandGui, &>>
+	GuiControl,, PhotoView,	; empty controls
+	GuiControl,, ExifEditfield,
+	GuiExpanded = 0
+  } else  {
+	Gui Show, w1018, Google Earth PhotoTag %version%
+	GuiControl, Text, ExpandGui, &<<
+	GuiExpanded = 1
+	ExtGuiNeedUpdate = 1
+  }
+  ExtGuiHasBeenOpened = 1
 return
 
 GuiContextMenu:
@@ -399,6 +462,7 @@ ExitApp
 
 ExifOk:
 3GuiClose:
+3GuiEscape:
   Gui 1:-Disabled
   Gui 3:Destroy
 return
