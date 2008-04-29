@@ -1,4 +1,4 @@
-; GoogleEarthPhotoTag.ahk  version 1.11
+; GoogleEarthPhotoTag.ahk  version 1.12
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -21,6 +21,7 @@
 ; open all - KML?
 
 ; Version history:
+; 1.12   -   small fix for photo/exif tabs
 ; 1.11   -   add photo preview and Exif info tabs
 ; 1.10   -   read and write Altitude * fix list column sizing
 ; 1.01   -   better view-Exif-info popup
@@ -29,7 +30,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.11
+version = 1.12
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -150,11 +151,14 @@ Gui, Add, text, yp xp+89, (any new files added will automatically be tagged with
 Gui, Add, Button, yp-2 xp+470 h18 w40 vAbout gAbout, &?
 Gui, Add, Button, yp xp+45 h18 w40 vExpandGui gExpandGui, &>>
 
-Gui, Add, Tab2,w340 h256 xm+658 ym, Show Photo|Show Exif
+Gui, Add, Tab2,w305 h256 xm+658 ym, Show Photo|Show Exif
 ;Gui, Add, Picture, w340 h227 xm+658 ym+29 vPhotoView,
-Gui, Add, Picture, w327 h218 xm+664 ym+29 vPhotoView,
+Gui, Add, Picture, w291 h218 xm+665 ym+29 vPhotoView,
 Gui, Tab, 2
-Gui, Add, Edit, t64 vExifEditfield +ReadOnly -Wrap -WantReturn w327 h218 xm+664 ym+29 
+;Gui, Font, s7, Arial
+Gui, Font, s7, Small Fonts
+Gui, Add, Edit, t64 vExifEditfield +ReadOnly -Wrap -WantReturn w291 h218 xm+665 ym+29 
+Gui, Font,
 Gui, Tab
 
 Gui, Add, StatusBar
@@ -167,6 +171,7 @@ LV_ModifyCol(5, 90)
 LV_ModifyCol(6, 193)
 ;Gui, Show, w1018, Google Earth PhotoTag %version%
 Gui Show, w668, Google Earth PhotoTag %version%
+Gui, +LastFound
 GuiExpanded = 0
 
 ; ------------- continous loop to track Google Earth coordinates -------------
@@ -421,6 +426,9 @@ return
 UpdatePhotoView:
   If(File) {
 	GuiControl,, PhotoView, *w-1 *h218 %Folder%\%File%
+	ControlGetPos,,, width, height, Static4, A		; no builtin function to get image width/height in ahk..check control size after load to see if we need to scale on width instead
+	if (width > 291)
+		GuiControl,, PhotoView, *w291 *h-1 %Folder%\%File%
   } else {
 	GuiControl,, PhotoView,	; empty control
   }
@@ -443,7 +451,7 @@ ExpandGui:
 	GuiControl,, ExifEditfield,
 	GuiExpanded = 0
   } else  {
-	Gui Show, w1018, Google Earth PhotoTag %version%
+	Gui Show, w977, Google Earth PhotoTag %version%
 	GuiControl, Text, ExpandGui, &<<
 	GuiExpanded = 1
 	ExtGuiNeedUpdate = 1
