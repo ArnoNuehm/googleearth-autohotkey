@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.11
+; _libGoogleEarth.ahk  version 1.12
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ;Version history:
+; 1.12   -   added ImageDim() function to get image width/height using imagemagick (or plain autohotkey identify.exe can't be found - slow..)
 ; 1.11   -   added GetGEpoint() function to read Altitude from GE * added GetPhotoLatLongAlt()/SetPhotoLatLongAlt() functions to read/write JPEG Altitude Exif
 
 
@@ -361,12 +362,37 @@ GetExif(fullfilename, byref StrOut, toolpath = "exiv2.exe") {
 	captureOutput(CMD, StrOut)
 }
 
+ImageDim(fullfilename, ImageMagickTool = "", skipifnoIM = "0") {
+	IfNotExist %fullfilename%
+		return 2
+	SplitPath fullfilename, filename, dir
+	If not (ImageMagickTool)
+		ImageMagickTool := findFile("identify.exe")
+	If (ImageMagickTool) {
+		CMD := COMSPEC " /C " ImageMagickTool " -ping -format ""%w x %h"" """ fullfilename """"
+		captureOutput(CMD, StrOut)
+		return StrOut
+	} else if not (skipifnoIM) {
+		DHW:=A_DetectHiddenWindows
+		DetectHiddenWindows, ON
+		Gui, 99:-Caption
+		Gui, 99:Margin, 0, 0
+		Gui, 99:Show,Hide w2592 h2592, ImageWxH.Temporary.GUI
+		Gui, 99:Add, Picture, x0 y0 , %fullfilename%
+		Gui, 99:Show,AutoSize Hide, ImageWxH.Temporary.GUI
+		WinGetPos, , ,w,h, ImageWxH.Temporary.GUI
+		Gui, 99:Destroy
+		DetectHiddenWindows, %DHW%
+		Return w " x " h
+	}
+}
+
 
 ; ================================================================== INTERNAL FUNCTIONS ==================================================================
 
 ; function is used internally - run command and return output - call with captureOutput(commandline, outputvar)
 captureOutput(CMD, byref StrOut) {
-	cmdretDllPath := findCmdretDll()
+	cmdretDllPath := findFile("cmdret.dll")
 	IfEqual cmdretDllPath
 	{
 		Random, rand, 11111111, 99999999
@@ -383,12 +409,12 @@ captureOutput(CMD, byref StrOut) {
 
 ; find cmdret.dll - function is used internally for deciding if to use cmdret.dll or "Run,,,hide" to get exiv2.exe command output
 ; %temp% is included in the search path to be able to use "FileInstall cmdret.dll, %A_Temp%\cmdret.dll" in compiled scripts
-findCmdretDll() {
-	EnvGet, EnvPath, Path
-	EnvPath := A_ScriptDir ";" A_Temp ";" A_AhkPath ";" EnvPath
-	Loop, Parse, EnvPath, `;
+findFile(filetofind) {
+	EnvGet, SearchFolders, Path
+	SearchFolders := A_ScriptDir ";" A_Temp ";" A_AhkPath ";" SearchFolders
+	Loop, Parse, SearchFolders, `;
 	{
-		IfExist, %A_LoopField%\cmdret.dll
-			return A_LoopField "\cmdret.dll"
+		IfExist, %A_LoopField%\%filetofind%
+			return A_LoopField "\" filetofind
 	}
 }
