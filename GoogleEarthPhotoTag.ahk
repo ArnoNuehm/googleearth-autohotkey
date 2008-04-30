@@ -1,4 +1,4 @@
-; GoogleEarthPhotoTag.ahk  version 1.12
+; GoogleEarthPhotoTag.ahk
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -21,6 +21,7 @@
 ; open all - KML?
 
 ; Version history:
+; 1.13   -   add option to disable reading altitude (sometimes slows down the Google Earth client)
 ; 1.12   -   small fix for photo/exif tabs
 ; 1.11   -   add photo preview and Exif info tabs
 ; 1.10   -   read and write Altitude * fix list column sizing
@@ -30,7 +31,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.12
+version = 1.13
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -118,9 +119,16 @@ If 0 > 0
 FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1	; bundle cmdret.dll in executable (avoids temp files when capturing cmdline output) - if opening in GUI mode extract to %temp% and use
 
 ; -------- create right-click menu -------------
+OnTop := 0
+ReadAlt := 1
 Menu, context, add, Always On Top, OnTop
+Menu, context, add, Read Altitude, ReadAlt
 Menu, context, add,
 Menu, context, add, About, About
+If OnTop
+	Menu, context, Check, Always On Top
+If ReadAlt
+	Menu, context, Check, Read Altitude
 
 ; ----------- create GUI ----------------
 Gui, Add, Button, ym xm vAddFiles gAddFiles w74, &Add Files...
@@ -156,6 +164,7 @@ Gui, Add, Tab2,w305 h256 xm+658 ym, Show Photo|Show Exif
 Gui, Add, Picture, w291 h218 xm+665 ym+29 vPhotoView,
 Gui, Tab, 2
 ;Gui, Font, s7, Arial
+;Gui, Font, s7, Lucida Console
 Gui, Font, s7, Small Fonts
 Gui, Add, Edit, t64 vExifEditfield +ReadOnly -Wrap -WantReturn w291 h218 xm+665 ym+29 
 Gui, Font,
@@ -180,7 +189,12 @@ Loop {
 		oldPointLatitude := PointLatitude	; save old values to only update GUI when there are changes (avoid problem selecting text with the mouse)
 		oldPointLongitude := PointLongitude
 		oldPointAltitude := PointAltitude
-		GetGEpoint(PointLatitude, PointLongitude, PointAltitude)
+		If (ReadAlt) {
+			GetGEpoint(PointLatitude, PointLongitude, PointAltitude)
+		} else {
+			GetGEpos(PointLatitude, PointLongitude, PointAltitude, AltitudeMode, Range, Tilt, Azimuth)
+			PointAltitude = 0
+		}
 		PointLatitude := Round(PointLatitude, 6)
 		PointLongitude := Round(PointLongitude, 6)
 		If (PointAltitude = 0) {
@@ -414,6 +428,11 @@ OnTop:
   Winset, AlwaysOnTop, Toggle, A
 return
 
+ReadAlt:
+  Menu, context, ToggleCheck, %A_ThisMenuItem%
+  ReadAlt := (ReadAlt - 1)**2	; toggle value 1/0
+return
+
 ListView:
   ;SB_SetText(A_GuiEvent " : " Folder "\" File) ;; xxxxxx
   If (A_GuiEvent = "DoubleClick") {
@@ -425,8 +444,9 @@ return
 
 UpdatePhotoView:
   If(File) {
-	GuiControl,, PhotoView, *w-1 *h218 %Folder%\%File%
-	ControlGetPos,,, width, height, Static4, A		; no builtin function to get image width/height in ahk..check control size after load to see if we need to scale on width instead
+	;ImageDim := ImageDim(Folder "\" File,"",1)
+	GuiControl,, PhotoView, *w-1 *h193 %Folder%\%File%	; height193 instead of 218 to avoid re-scale twice below (..this bit is pretty messy..need a way to find true image dimensions..)
+	ControlGetPos,,, width, height, Static4, A		; no builtin function to get image width/height in ahk..check control size after load to see if it overflows - if so scale on width instead
 	if (width > 291)
 		GuiControl,, PhotoView, *w291 *h-1 %Folder%\%File%
   } else {
@@ -489,16 +509,17 @@ About:
   Gui 2:Add,Text,xm yp+36, Check for updates here:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gWeblink yp+15, http://david.tryse.net/googleearth/
+  Gui 2:Add,Text,xm gWeblink2 yp+15, http://googleearth-autohotkey.googlecode.com
   Gui 2:Font
-  Gui 2:Add,Text,xm yp+20, For bug reports or ideas email:
+  Gui 2:Add,Text,xm yp+22, For bug reports or ideas email:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gEmaillink yp+15, davidtryse@gmail.com
   Gui 2:Font
-  Gui 2:Add,Text,xm yp+28, This program requires exiv2.exe:
+  Gui 2:Add,Text,xm yp+26, This program requires exiv2.exe:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gExiv2link yp+15, http://www.exiv2.org/
   Gui 2:Font
-  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-60 x180,&OK
+  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-60 x195,&OK
   Gui 2:Show,,About: Google Earth PhotoTag
   Gui 2:+LastFound
   WinSet AlwaysOnTop
@@ -506,6 +527,10 @@ Return
 
 Weblink:
   Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+Return
+
+Weblink2:
+  Run, http://googleearth-autohotkey.googlecode.com,,UseErrorLevel
 Return
 
 Emaillink:
