@@ -1,4 +1,4 @@
-; GoogleEarthPosition.ahk  version 1.02
+; GoogleEarthPosition.ahk
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 
 ; Version history:
+; 1.04   -   * add option to disable reading altitude (sometimes slows down the Google Earth client) *
 ; 1.03   -   * add six mini-bookmarks * add tooltips *
 ; 1.02   -   * read Terrain Altitude * add drop-down list for AltitudeMode * DMS coord in statusbar * keyboard shortcuts * fix edit-box text-select in auto-mode * round values option (right-click menu) *
 
@@ -23,19 +24,25 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.03
+version = 1.04
 
 Speed := 1.0
+OnTop := 1
 RoundVal := 1
+ReadAlt := 0
 
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop
-Menu, context, Check, Always On Top
 Menu, context, add, Round values, RoundVal
-If RoundVal
-	Menu, context, Check, Round values
+Menu, context, add, Read Altitude, ReadAlt
 Menu, context, add,
 Menu, context, add, About, About
+If OnTop
+	Menu, context, Check, Always On Top
+If RoundVal
+	Menu, context, Check, Round values
+If ReadAlt
+	Menu, context, Check, Read Altitude
 
 ; ----------- create GUI ----------------
 Gui, Add, Text, x10, FocusPointLatitude:
@@ -108,7 +115,10 @@ Loop {
 		  GuiControl, +ReadOnly, Tilt,
 		  GuiControl, +ReadOnly, Azimuth,
 		  GuiControl, +ReadOnly, Speed,
-		  GuiControl, -Disabled, Altitude,
+		  If ReadAlt
+			GuiControl, -Disabled, Altitude,
+		  Else
+			GuiControl, +Disabled, Altitude,
 		  GuiControl, +Disabled, FlyTo,
 		  GuiControl, +Disabled, GetPos,
 	  } else {
@@ -142,7 +152,10 @@ GetPos:
   oldPointAltitude := PointAltitude
   oldDMSCoord := DMSCoord
   GetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth)
-  GetGEpoint(PointLatitude, PointLongitude, PointAltitude)
+  If (ReadAlt)
+	GetGEpoint(PointLatitude, PointLongitude, PointAltitude)
+  else
+	PointAltitude :=
   If (RoundVal) {
 	FocusPointLatitude := Round(FocusPointLatitude,6)
 	FocusPointLongitude := Round(FocusPointLongitude,6)
@@ -276,6 +289,15 @@ RoundVal:
   RoundVal := (RoundVal - 1)**2	; toggle value 1/0
 return
 
+ReadAlt:
+  Menu, context, ToggleCheck, %A_ThisMenuItem%
+  ReadAlt := (ReadAlt - 1)**2	; toggle value 1/0
+  If ReadAlt
+	GuiControl, -Disabled, Altitude,
+  Else
+	GuiControl, +Disabled, Altitude,
+return
+
 GuiContextMenu:
   Menu, context, Show
 return
@@ -299,15 +321,16 @@ About:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gMapperlink yp+15, http://earth.google.com/outreach/tutorial_mapper.html
   Gui 2:Font
-  Gui 2:Add,Text,xm yp+36, Check for updates here:
+  Gui 2:Add,Text,xm yp+32, Check for updates here:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gWeblink yp+15, http://david.tryse.net/googleearth/
+  Gui 2:Add,Text,xm gWeblink2 yp+15, http://googleearth-autohotkey.googlecode.com
   Gui 2:Font
-  Gui 2:Add,Text,xm yp+20, For bug reports or suggestions email:
+  Gui 2:Add,Text,xm yp+24, For bug reports or suggestions email:
   Gui 2:Font,CBlue Underline
   Gui 2:Add,Text,xm gEmaillink yp+15, davidtryse@gmail.com
   Gui 2:Font
-  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-60 x230,&OK
+  Gui 2:Add,Button,gAboutOk Default w80 h80 yp-60 x245,&OK
   Gui 2:Show,,About: Google Earth Position
   Gui 2:+LastFound
   WinSet AlwaysOnTop
@@ -315,6 +338,10 @@ Return
 
 Weblink:
   Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+Return
+
+Weblink2:
+  Run, http://googleearth-autohotkey.googlecode.com,,UseErrorLevel
 Return
 
 Mapperlink:
