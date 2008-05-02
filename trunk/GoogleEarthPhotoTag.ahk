@@ -15,12 +15,13 @@
 ; Needs ws4ahk.ahk library:  http://www.autohotkey.net/~easycom/
 ; Needs exiv2.exe to read/write Exif GPS data:  http://www.exiv2.org/
 ; Will optionally use cmdret.dll if present (to avoid temp files for command output):  http://www.autohotkey.com/forum/topic3687.html
-
+; 
 ; TODO
 ; multi-select (del and save)
 ; open all - KML?
-
+; 
 ; Version history:
+; 1.14   -   add Edit Exif tab
 ; 1.13   -   add option to disable reading altitude (sometimes slows down the Google Earth client)
 ; 1.12   -   small fix for photo/exif tabs
 ; 1.11   -   add photo preview and Exif info tabs
@@ -31,7 +32,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.13
+version = 1.14
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -146,9 +147,9 @@ LV_ModifyCol(3, "Integer")
 LV_ModifyCol(4, "Integer")
 
 Gui, Add, Button, ym+210 xm+0 vOpenPhoto gOpenPhoto default, &Open photo
-Gui, Add, Button, yp xp+76 vShowExif gShowExif, Show &Exif
-Gui, Add, Button, yp xp+62 vDeleteExif gDeleteExif, Delete ExifGPS
-Gui, Add, Button, yp xp+124 vFlyTo gFlyTo, &Fly to this photo in Google Earth
+;Gui, Add, Button, yp xp+76 vShowExif gShowExif, Show &Exif
+;Gui, Add, Button, yp xp+62 vDeleteExif gDeleteExif, Delete ExifGPS
+Gui, Add, Button, yp xm+262 vFlyTo gFlyTo, &Fly to this photo in Google Earth
 Gui, Add, Button, yp xp+167 vSavePos gSavePos, &Save Google Earth coordinates to this photo
 Gui, Add, Button, yp x0 hidden vreload greload, reloa&d
 
@@ -159,19 +160,33 @@ Gui, Add, text, yp xp+89, (any new files added will automatically be tagged with
 Gui, Add, Button, yp-2 xp+470 h18 w40 vAbout gAbout, &?
 Gui, Add, Button, yp xp+45 h18 w40 vExpandGui gExpandGui, &>>
 
-Gui, Add, Tab2,w305 h256 xm+658 ym, Show Photo|Show Exif
-;Gui, Add, Picture, w340 h227 xm+658 ym+29 vPhotoView,
-Gui, Add, Picture, w291 h218 xm+665 ym+29 vPhotoView,
+Gui, Add, Tab2, w305 h256 xm+658 ym vExtGUITabs AltSubmit, Show Photo|Show Exif|Edit Exif
+  ;Gui, Add, Picture, w340 h227 xm+658 ym+29 vPhotoView,
+  Gui, Add, Picture, w291 h218 xm+665 ym+29 vPhotoView,
 Gui, Tab, 2
-;Gui, Font, s7, Arial
-;Gui, Font, s7, Lucida Console
-Gui, Font, s7, Small Fonts
-Gui, Add, Edit, t64 vExifEditfield +ReadOnly -Wrap -WantReturn w291 h218 xm+665 ym+29 
-Gui, Font,
+  ;Gui, Font, s7, Arial
+  ;Gui, Font, s7, Lucida Console
+  Gui, Font, s7, Small Fonts
+  Gui, Add, Edit, t64 vExifEditfield +ReadOnly -Wrap -WantReturn w291 h218 xm+665 ym+29 
+  Gui, Font,
+Gui, Tab, 3
+  Gui, Add, Text, ym+42 xm+670, Latitude:
+  Gui, Add, Edit, yp-2 xp+57 w160 vEditLatitude,
+  Gui, Add, Text, yp+31 xm+670, Longitude:
+  Gui, Add, Edit, yp-2 xp+57 w160 vEditLongitude,
+  Gui, Add, Text, yp+31 xm+670, Altitude:
+  Gui, Add, Edit, yp-2 xp+57 w160 vEditAltitude,
+  Gui, Add, Button, yp+32 xm+727 vSaveEdit gSaveEdit, Save to File
+  Gui, Add, Button, yp xp+74 vDeleteExif gDeleteExif, Delete GPS-tag
+  Gui, Add, Button, yp+36 xm+680 w115 h22 vCopyExif gCopyExif, Copy to clipboard
+  Gui, Add, Button, yp xp+121 w86 h22 vPasteExif gPasteExif, Paste to File
+  Gui, Add, Button, yp+36 xm+680 w207 h20 vShowExif gShowExif, Show all &Exif tags
+  ;Gui, Add, Button, ym+40 xm+904 h36 w40 vCopyExif gCopyExif, Copy
+  ;Gui, Add, Button, yp+43 xm+904 h36 w40 vPasteExif gPasteExif, Paste
 Gui, Tab
 
 Gui, Add, StatusBar
-SB_SetText(" This tool requires exiv2.exe from http://www.exiv2.org/")  ; update statusbar
+;SB_SetText(" This tool requires exiv2.exe from http://www.exiv2.org/")  ; update statusbar
 LV_ModifyCol(1, 143)  ; Size columns
 LV_ModifyCol(2, 80)
 LV_ModifyCol(3, 80)
@@ -213,18 +228,23 @@ Loop {
 		GuiControl,,PointLatitude, not running
 		GuiControl,,PointLongitude,
 		GuiControl,,PointAltitudeM,
-		SB_SetText(" Google Earth is not running.")	; update statusbar
+		;SB_SetText(" Google Earth is not running.")	; update statusbar
 	}
 	FocusedRowNumber := LV_GetNext(0, "F")
+	Gui, Submit, NoHide
 	If (FocusedRowNumber != OldFocusedRowNumber) {
-		ExtGuiNeedUpdate = 1
-		if (not ExtGuiHasBeenOpened and FocusedRowNumber) {
-			If (not GuiExpanded)
-				Gosub ExpandGui				; open the view-photo tab if first time a file has been selected
-		}
-	} else if (ExtGuiNeedUpdate = 1) and (GuiExpanded = 1) {
 		Gosub FindFocused
-		Gosub UpdatePhotoView
+		GuiControl,,EditLatitude, %ListLatitude%
+		GuiControl,,EditLongitude, %ListLongitude%
+		GuiControl,,EditAltitude, %ListAltitude%
+		GuiControl,, PhotoView,	; empty control
+		GuiControl,, ExifEditfield,	; empty control
+		ExtGuiNeedUpdate = 2
+		if (not ExtGuiHasBeenOpened and FocusedRowNumber and not GuiExpanded)
+			Gosub ExpandGui				; open the view-photo tab if first time a file has been selected
+	} else if (ExtGuiNeedUpdate >= 1 and GuiExpanded = 1 and (ExtGUITabs = 1 or ExtGUITabs = 2)) {		; update photo view only if FocusedRowNumber = OldFocusedRowNumber (avoid slowing down moving selection in the GUI)
+		if (ExtGuiNeedUpdate >= 2)
+			Gosub UpdatePhotoView
 		Gosub UpdateExifView
 		ExtGuiNeedUpdate = 0
 	}
@@ -254,7 +274,7 @@ return
 AddFileToList:
   Gui, Submit, NoHide
   If (AutoMode) and IsGErunning() {
-	Gosub WriteExif
+	logmsg := WriteExif(PointLatitude, PointLongitude, PointAltitude)
   } else {
 	Gosub ReadExif
   }
@@ -270,19 +290,19 @@ ReadExif:
 return
 
 ; ----------- write Exif GPS data to file ---------------
-WriteExif:
-  If IsGErunning() {
-	IfEqual PointAltitude
-		SB_SetText("Writing coordinates " PointLatitude ", " PointLongitude " to file " File )  ; update statusbar
-	Else
-		SB_SetText("Writing coordinates " PointLatitude ", " PointLongitude " (" PointAltitude "m)" " to file " File )  ; update statusbar
-	logmsg := "write Exif failed"
-	SetPhotoLatLongAlt(Folder "\" File, PointLatitude, PointLongitude, PointAltitude, exiv2path)
-	GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)	; read Exif back from photo to make sure write operation succeded
-	If (Dec2Deg(FileLatitude) = Dec2Deg(PointLatitude)) and (Dec2Deg(FileLongitude) = Dec2Deg(PointLongitude) and (PointAltitude = FileAltitude or PointAltitude = ""))    ; cannot compare directly without Dec2Deg() as 41.357892/41.357893 both equal 41° 21' 28.41'' N etc..
-		logmsg := "write Exif ok"
-  }
-return
+WriteExif(WriteLatitude, WriteLongitude, WriteAltitude="") {
+  global ; make function able to read File/Filder/exiv2path, and able to write to FileLatitude/FileLongitude/FileAltitude without needing lots of extra parameters
+  IfEqual WriteAltitude
+	SB_SetText("Writing coordinates " WriteLatitude ", " WriteLongitude " to file " File )  ; update statusbar
+  Else
+	SB_SetText("Writing coordinates " WriteLatitude ", " WriteLongitude " (" WriteAltitude "m)" " to file " File )  ; update statusbar
+  SetPhotoLatLongAlt(Folder "\" File, WriteLatitude, WriteLongitude, WriteAltitude, exiv2path)
+  GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)	; read Exif back from photo to make sure write operation succeded
+  If (Dec2Deg(FileLatitude) = Dec2Deg(WriteLatitude)) and (Dec2Deg(FileLongitude) = Dec2Deg(WriteLongitude) and (WriteAltitude = FileAltitude or WriteAltitude = ""))    ; cannot compare directly without Dec2Deg() as 41.357892/41.357893 both equal 41° 21' 28.41'' N etc..
+	return "write Exif ok"
+  else
+	return "write Exif failed"
+}
 
 ; =================================================== functions for GUI buttons ============================================================
 
@@ -308,8 +328,8 @@ return
 Clear:
   LV_Delete() ; delete all rows in listview
   SB_SetText("Clear...")  ; update statusbar
-  If (GuiExpanded)
-	Gosub ExpandGui
+;  If (GuiExpanded)
+;	Gosub ExpandGui
 return
 
 Reread:
@@ -361,6 +381,38 @@ DeleteExif:
   If not FileLatitude and not FileLongitude and not FileAltitude
 	logmsg = delete Exif ok
   LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
+  GuiControl,,EditLatitude,
+  GuiControl,,EditLongitude,
+  GuiControl,,EditAltitude,
+return
+
+CopyExif:
+  Gui, Submit, NoHide
+  clipboard := "GPS|" EditLatitude "|" EditLongitude "|" EditAltitude
+  SB_SetText("Copy coordinates " EditLatitude ", " EditLongitude " (" EditAltitude "m)" " to clipboard.")
+return
+
+PasteExif:
+  Loop, parse, clipboard, |,
+  {
+	If (A_Index = 1 and A_LoopField != "GPS")
+		return
+	If (A_Index = 2)
+		GuiControl,,EditLatitude, %A_LoopField%
+	If (A_Index = 3)
+		GuiControl,,EditLongitude, %A_LoopField%
+	If (A_Index = 4)
+		GuiControl,,EditAltitude, %A_LoopField%
+  }
+  Gui, Submit, NoHide
+  logmsg := WriteExif(EditLatitude, EditLongitude, EditAltitude)
+  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
+return
+
+SaveEdit:
+  Gui, Submit, NoHide
+  logmsg := WriteExif(EditLatitude, EditLongitude, EditAltitude)
+  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
 return
 
 FlyTo:
@@ -375,11 +427,16 @@ return
 
 SavePos:
   If IsGErunning() {
-	  Gosub FindFocused
-	  IfEqual File
+	Gosub FindFocused
+	IfEqual File
 		return
-	  Gosub WriteExif
-	  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
+	logmsg := WriteExif(PointLatitude, PointLongitude, PointAltitude)
+	LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
+	GuiControl,,EditLatitude, %FileLatitude%
+	GuiControl,,EditLongitude, %FileLongitude%
+	GuiControl,,EditAltitude, %FileAltitude%
+	if (ExtGuiNeedUpdate = 0)
+		ExtGuiNeedUpdate = 1
   } else {
 	SB_SetText(" Google Earth is not running.")  ; update statusbar
   }
@@ -445,9 +502,9 @@ return
 UpdatePhotoView:
   If(File) {
 	;ImageDim := ImageDim(Folder "\" File,"",1)
-	GuiControl,, PhotoView, *w-1 *h193 %Folder%\%File%	; height193 instead of 218 to avoid re-scale twice below (..this bit is pretty messy..need a way to find true image dimensions..)
+	GuiControl,, PhotoView, *w-1 *h190 %Folder%\%File%	; height193 instead of 218 to avoid re-scale twice below (..this bit is pretty messy..need a way to find true image dimensions..)
 	ControlGetPos,,, width, height, Static4, A		; no builtin function to get image width/height in ahk..check control size after load to see if it overflows - if so scale on width instead
-	if (width > 291)
+	if (width > 295) 					; scale very wide photos on width instead of height to avoid flowing outside control..
 		GuiControl,, PhotoView, *w291 *h-1 %Folder%\%File%
   } else {
 	GuiControl,, PhotoView,	; empty control
@@ -474,7 +531,7 @@ ExpandGui:
 	Gui Show, w977, Google Earth PhotoTag %version%
 	GuiControl, Text, ExpandGui, &<<
 	GuiExpanded = 1
-	ExtGuiNeedUpdate = 1
+	ExtGuiNeedUpdate = 2
   }
   ExtGuiHasBeenOpened = 1
 return
