@@ -14,12 +14,15 @@
 ;	8°32'54.73"S, 119°29'28.98"E
 ; 
 ; Needs _libGoogleEarth.ahk library:  http://david.tryse.net/googleearth/
+; 
+; 1.05   -   use new _libGoogleEarth.ahk library (handles Deg Min and Deg format as well as Deg Min Sec)
+; 1.03   -   always-on-top option
 
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.04
+version = 1.05
 
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop
@@ -36,11 +39,11 @@ Gui Add, Button, yp-16 xp+160 h32 w40 vAbout gAbout, ?
 Gui, Add, Edit, y50 x5 vDegrees -Wrap W200 R20 -ReadOnly
 Gui, Add, Edit, y50 x250 vDecimal -Wrap W200 R20 -ReadOnly
 
-Gui, Add, Button, y90 x210 w35 h50, >>
-Gui, Add, Button, y150 x210 w35 h50, <<
+Gui, Add, Button, y90 x210 w35 h50, &>>
+Gui, Add, Button, y150 x210 w35 h50, &<<
 
-Gui, Add, Button, y325 x10 w100 , Copy_Degrees
-Gui, Add, Button, y325 x255 w100 , Copy_Decimal
+Gui, Add, Button, y325 x10 w100 , Copy_De&grees
+Gui, Add, Button, y325 x255 w100 , Copy_De&cimal
 
 Gui, Show,, LatLong Conversion %version%
 Gui +LastFound
