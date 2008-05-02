@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.13
+; _libGoogleEarth.ahk  version 1.14
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ;Version history:
+; 1.14   -   remake Deg2Dec() to understand when Lat and Long are different format - one is Deg Min and one Deg Min Sec etc.
 ; 1.13   -   make Deg2Dec() understand "Deg Min" and "Deg" formats in addition to Deg Min Sec
 ; 1.12   -   added ImageDim() function to get image width/height using imagemagick (or plain autohotkey identify.exe can't be found - slow..)
 ; 1.11   -   added GetGEpoint() function to read Altitude from GE * added GetPhotoLatLongAlt()/SetPhotoLatLongAlt() functions to read/write JPEG Altitude Exif
@@ -103,42 +104,66 @@ Deg2Dec(DegCoord, mode = "both") {
 	StringReplace DegCoord,DegCoord,W e st,West
 	StringReplace DegCoord,DegCoord,W est,West
 	StringReplace DegCoord,DegCoord,%A_Tab%,%A_Space%,All
-	Loop {   ; loop to replace all double spaces (otherwise StringSplit wont work properly)
+	Loop {  		 	; loop to replace all double spaces (otherwise StringSplit wont work properly)
 		StringReplace DegCoord,DegCoord,%A_Space%%A_Space%,%A_Space%,All UseErrorLevel
-		if ErrorLevel = 0  ; No more replacements needed.
+		if ErrorLevel = 0 	; No more replacements needed.
 			break
 	}
-	DegCoord = %DegCoord%  ; remove start/end spaces
-	StringSplit word, DegCoord, %A_Space%
-	if (word4 = "S" or word4 = "South" or word4 = "N" or word4 = "North") and (word8 = "W" or word8 = "West" or word8 = "E" or word8 = "East") {	; format is "Deg Min Sec"
-		if (word9)
+	DegCoord = %DegCoord% 		; remove start/end spaces
+	Lat :=
+	Loop, parse, DegCoord, %A_Space%,
+	{
+		if (A_Index = 1)
+			LatD := A_LoopField
+		else if (A_Index = 2) and (A_LoopField = "S" or A_LoopField = "South")	; format is Deg
+			Lat := LatD * -1
+		else if (A_Index = 2) and (A_LoopField = "N" or A_LoopField = "North")	; format is Deg
+			Lat := LatD * 1
+		else if (A_Index = 2)
+			LatM := A_LoopField
+		else if (A_Index = 3) and (A_LoopField = "S" or A_LoopField = "South")	; format is Deg Min
+			Lat := (LatD + LatM/60) * -1
+		else if (A_Index = 3) and (A_LoopField = "N" or A_LoopField = "North")	; format is Deg Min
+			Lat := (LatD + LatM/60) * 1
+		else if (A_Index = 3)
+			LatS := A_LoopField
+		else if (A_Index = 4) and (A_LoopField = "S" or A_LoopField = "South")	; format is Deg Min Sec
+			Lat := (LatD + LatM/60 + LatS/60/60) * -1
+		else if (A_Index = 4) and (A_LoopField = "N" or A_LoopField = "North")	; format is Deg Min Sec
+			Lat := (LatD + LatM/60 + LatS/60/60) * 1
+		if (A_Index = 4 and not Lat)
 			return "error"
-		Lat := word1 + word2/60 + word3/60/60
-		If (word4 = "S") or (word4 = "South")
-			Lat := Lat * -1
-		Long := word5 + word6/60 + word7/60/60
-		If (word8 = "W") or (word8 = "West")
-			Long := Long * -1
-	} else if (word3 = "S" or word3 = "South" or word3 = "N" or word3 = "North") and (word6 = "W" or word6 = "West" or word6 = "E" or word6 = "East") {	; format is "Deg Min"
-		if (word7)
+		if (Lat) {
+			LatEnd := A_Index		; save where Latitude ends - for Longitude loop
+			Break
+		}
+	}
+	Long :=
+	Loop, parse, DegCoord, %A_Space%,
+	{
+		if (A_Index = LatEnd+1)
+			LongD := A_LoopField
+		else if (A_Index = LatEnd+2) and (A_LoopField = "W" or A_LoopField = "West")	; format is Deg
+			Long := LongD * -1
+		else if (A_Index = LatEnd+2) and (A_LoopField = "E" or A_LoopField = "East")	; format is Deg
+			Long := LongD * 1
+		else if (A_Index = LatEnd+2)
+			LongM := A_LoopField
+		else if (A_Index = LatEnd+3) and (A_LoopField = "W" or A_LoopField = "West")	; format is Deg Min
+			Long := (LongD + LongM/60) * -1
+		else if (A_Index = LatEnd+3) and (A_LoopField = "E" or A_LoopField = "East")	; format is Deg Min
+			Long := (LongD + LongM/60) * 1
+		else if (A_Index = LatEnd+3)
+			LongS := A_LoopField
+		else if (A_Index = LatEnd+4) and (A_LoopField = "W" or A_LoopField = "West")	; format is Deg Min Sec
+			Long := (LongD + LongM/60 + LongS/60/60) * -1
+		else if (A_Index = LatEnd+4) and (A_LoopField = "E" or A_LoopField = "East")	; format is Deg Min Sec
+			Long := (LongD + LongM/60 + LongS/60/60) * 1
+		if (A_Index = LatEnd+4 and not Long)
 			return "error"
-		Lat := word1 + word2/60
-		If (word3 = "S") or (word3 = "South")
-			Lat := Lat * -1
-		Long := word4 + word5/60
-		If (word6 = "W") or (word6 = "West")
-			Long := Long * -1
-	} else if (word2 = "S" or word2 = "South" or word2 = "N" or word2 = "North") and (word4 = "W" or word4 = "West" or word4 = "E" or word4 = "East") {	; format is "Deg"
-		if (word5)
-			return "error"
-		Lat := word1
-		If (word2 = "S") or (word2 = "South")
-			Lat := Lat * -1
-		Long := word3
-		If (word4 = "W") or (word4 = "West")
-			Long := Long * -1
-	} else {
-		return "error"
+		if (Long) {
+			Break
+		}
 	}
 	If mode = lat
 		return Lat
