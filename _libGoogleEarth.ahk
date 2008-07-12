@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.15
+; _libGoogleEarth.ahk  version 1.16
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.16   -   added FileDescription() function (only reads descript.ion atm, not jpeg comment)
 ; 1.15   -   Fix for localized OS with "," instead of "." as decimal separator (thanks Antti Rasi)
 ; 1.14   -   remake Deg2Dec() to understand when Lat and Long are different format - one is Deg Min and one Deg Min Sec etc.
 ; 1.13   -   make Deg2Dec() understand "Deg Min" and "Deg" formats in addition to Deg Min Sec
@@ -443,6 +444,20 @@ ImageDim(fullfilename, ImageMagickTool = "", skipifnoIM = "0") {
 	}
 }
 
+; read file description (only descript.ion atm, not jpeg comment)
+FileDescription(FileFullname) {
+  SplitPath, FileFullname, Name, Dir
+  FileRead, DescriptIon, %Dir%\descript.ion
+  If RegExMatch(DescriptIon, "m)^""?" Name """?(.*)", Descr)
+	return Descr1
+  ;Loop, read, %Dir%\descript.ion
+  ;{
+	;If RegExMatch(A_LoopReadLine, "m)^""?" Name """?(.*)", Descr)
+	;	return Descr1
+	;If RegExMatch(A_LoopReadLine, "^""?" Name """?(.*)", Descr)
+	;	return Descr1
+  ;}	
+}
 
 ; ================================================================== INTERNAL FUNCTIONS ==================================================================
 
