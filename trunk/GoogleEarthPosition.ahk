@@ -14,8 +14,9 @@
 ; Needs ws4ahk.ahk library:  http://www.autohotkey.net/~easycom/
 ; 
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
-
+; 
 ; Version history:
+; 1.05   -   use new _libGoogleEarth.ahk library 1.15 (fix for localized OS)
 ; 1.04   -   * add option to disable reading altitude (sometimes slows down the Google Earth client) *
 ; 1.03   -   * add six mini-bookmarks * add tooltips *
 ; 1.02   -   * read Terrain Altitude * add drop-down list for AltitudeMode * DMS coord in statusbar * keyboard shortcuts * fix edit-box text-select in auto-mode * round values option (right-click menu) *
@@ -24,7 +25,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.04
+version = 1.05
 
 Speed := 1.0
 OnTop := 1
