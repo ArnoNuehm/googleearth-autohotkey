@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.14
+; _libGoogleEarth.ahk  version 1.15
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -16,10 +16,11 @@
 ; 
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
-;Version history:
+; Version history:
+; 1.15   -   Fix for localized OS with "," instead of "." as decimal separator (thanks Antti Rasi)
 ; 1.14   -   remake Deg2Dec() to understand when Lat and Long are different format - one is Deg Min and one Deg Min Sec etc.
 ; 1.13   -   make Deg2Dec() understand "Deg Min" and "Deg" formats in addition to Deg Min Sec
-; 1.12   -   added ImageDim() function to get image width/height using imagemagick (or plain autohotkey identify.exe can't be found - slow..)
+; 1.12   -   added ImageDim() function to get image width/height using imagemagick (or plain autohotkey if identify.exe can't be found - slow..)
 ; 1.11   -   added GetGEpoint() function to read Altitude from GE * added GetPhotoLatLongAlt()/SetPhotoLatLongAlt() functions to read/write JPEG Altitude Exif
 
 
@@ -44,25 +45,25 @@ VBCode =
    Dim pointPos
   
    Function testGe()
-   Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
-   testGe = googleEarth.IsInitialized()
+	Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
+	testGe = googleEarth.IsInitialized()
    end Function
 
    Function gePos()
-   Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
-   Set camPos = googleEarth.GetCamera(1)
-   gePos = camPos.FocusPointLatitude & ":" & camPos.FocusPointLongitude & ":" & camPos.FocusPointAltitude & ":" & camPos.FocusPointAltitudeMode & ":" & camPos.Range & ":" & camPos.Tilt & ":" & camPos.Azimuth & ":"
+	Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
+	Set camPos = googleEarth.GetCamera(1)
+	gePos = camPos.FocusPointLatitude & ":" & camPos.FocusPointLongitude & ":" & camPos.FocusPointAltitude & ":" & camPos.FocusPointAltitudeMode & ":" & camPos.Range & ":" & camPos.Tilt & ":" & camPos.Azimuth & ":"
    end Function
 
    Function geSetPos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth, Speed)
-   Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
-   Set geSetPos = googleEarth.SetCameraParams(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth, Speed)
+	Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
+	Set geSetPos = googleEarth.SetCameraParams(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth, Speed)
    end Function
 
    Function gePoint()
-   Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
-   Set pointPos = googleEarth.GetPointOnTerrainFromScreenCoords(0,0)
-   gePoint = pointPos.Latitude & ":" & pointPos.Longitude & ":" & pointPos.Altitude & ":" & pointPos.ProjectedOntoGlobe & ":" & pointPos.ZeroElevationExaggeration & ":"
+	Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
+	Set pointPos = googleEarth.GetPointOnTerrainFromScreenCoords(0,0)
+	gePoint = pointPos.Latitude & ":" & pointPos.Longitude & ":" & pointPos.Altitude & ":" & pointPos.ProjectedOntoGlobe & ":" & pointPos.ZeroElevationExaggeration & ":"
    end Function
 
 )
@@ -256,6 +257,7 @@ GetGEpos(byref FocusPointLatitude, byref FocusPointLongitude, byref FocusPointAl
 	If not IsGErunning()
 		return 1
 	WS_Eval(theValue, "gePos()")
+	StringReplace theValue,theValue,`,,.,All		; fix for localized OS - thanks Antti Rasi
 	StringSplit word_array,theValue,:,
 	FocusPointLatitude	= %word_array1%
 	FocusPointLongitude	= %word_array2%
@@ -280,6 +282,7 @@ GetGEpoint(byref PointLatitude, byref PointLongitude, byref PointAltitude) {
 	If not IsGErunning()
 		return 1
 	WS_Eval(theValue, "gePoint()")
+	StringReplace theValue,theValue,`,,.,All		; fix for localized OS - thanks Antti Rasi
 	StringSplit word_array,theValue,:,
 	PointLatitude	= %word_array1%
 	PointLongitude	= %word_array2%
