@@ -19,8 +19,11 @@
 ; TODO
 ; multi-select (del and save)
 ; open all - KML?
+; move photo up/down in list
 ; 
 ; Version history:
+; 1.16   -   make KML file * save/load file+coord lists (*.PhotoTagList) * error handling on missing files
+; 1.15   -   use new _libGoogleEarth.ahk library 1.15 (fix for localized OS)
 ; 1.14   -   add Edit Exif tab
 ; 1.13   -   add option to disable reading altitude (sometimes slows down the Google Earth client)
 ; 1.12   -   small fix for photo/exif tabs
@@ -32,7 +35,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.14
+version = 1.16
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -118,10 +121,13 @@ If 0 > 0
 }
 
 FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1	; bundle cmdret.dll in executable (avoids temp files when capturing cmdline output) - if opening in GUI mode extract to %temp% and use
+FileInstall, dark.PlacemarkStyle, dark.PlacemarkStyle  ; write placemark style templaces to executable dir if not exist already
+FileInstall, white.PlacemarkStyle, white.PlacemarkStyle
+FileInstall, stylish.PlacemarkStyle, stylish.PlacemarkStyle
 
 ; -------- create right-click menu -------------
 OnTop := 0
-ReadAlt := 1
+ReadAlt := 0
 Menu, context, add, Always On Top, OnTop
 Menu, context, add, Read Altitude, ReadAlt
 Menu, context, add,
@@ -147,6 +153,7 @@ LV_ModifyCol(3, "Integer")
 LV_ModifyCol(4, "Integer")
 
 Gui, Add, Button, ym+210 xm+0 vOpenPhoto gOpenPhoto default, &Open photo
+Gui, Add, Button, yp xp+80 vSaveList gSaveList, Save List
 ;Gui, Add, Button, yp xp+76 vShowExif gShowExif, Show &Exif
 ;Gui, Add, Button, yp xp+62 vDeleteExif gDeleteExif, Delete ExifGPS
 Gui, Add, Button, yp xm+262 vFlyTo gFlyTo, &Fly to this photo in Google Earth
@@ -155,10 +162,23 @@ Gui, Add, Button, yp x0 hidden vreload greload, reloa&d
 
 Gui, Font, bold
 Gui, Add, Checkbox, yp+30 xm+6 vAutoMode, %A_Space%Auto-Mode 
-Gui, font, norm
-Gui, Add, text, yp xp+89, (any new files added will automatically be tagged with the current Google Earth coordinates)
+Gui, Font, norm
+Gui, Add, Text, yp xp+89, (any new files added will automatically be tagged with the current Google Earth coordinates)
 Gui, Add, Button, yp-2 xp+470 h18 w40 vAbout gAbout, &?
-Gui, Add, Button, yp xp+45 h18 w40 vExpandGui gExpandGui, &>>
+Gui, Add, Button, yp xp+45 h18 w40 vExpandGuiToggle gExpandGuiToggle, &>>
+
+;Gui, Font, bold s11
+;Gui, Add, Text, yp+33 xm, KML
+;Gui, Font, norm s9
+Gui, Add, GroupBox, yp+20 xm w650 h46, KML
+Gui, Add, Button, yp+16 xm+10 w46 gKMLOpen, Open
+Gui, Add, Button, yp xp+54 w46 gKMLSave, Save
+Gui, Add, Text, yp+5 xp+64, Placemark style:
+Loop %A_ScriptDir%\*.PlacemarkStyle
+   PlacemarkStyleList = %PlacemarkStyleList%%A_LoopFileName%|
+StringReplace, PlacemarkStyleList, PlacemarkStyleList, .PlacemarkStyle,, All
+Gui, Add, DropDownList, yp-5 xp+82 w91 h10 R4 vKMLstylename Choose1, %PlacemarkStyleList%
+Gui, Add, Checkbox, yp h24 xp+110 vRouteLine Checked, Route-line
 
 Gui, Add, Tab2, w305 h256 xm+658 ym vExtGUITabs AltSubmit, Show Photo|Show Exif|Edit Exif
   ;Gui, Add, Picture, w340 h227 xm+658 ym+29 vPhotoView,
@@ -178,9 +198,9 @@ Gui, Tab, 3
   Gui, Add, Edit, yp-2 xp+57 w160 vEditAltitude,
   Gui, Add, Button, yp+32 xm+727 vSaveEdit gSaveEdit, Save to File
   Gui, Add, Button, yp xp+74 vDeleteExif gDeleteExif, Delete GPS-tag
-  Gui, Add, Button, yp+36 xm+680 w115 h22 vCopyExif gCopyExif, Copy to clipboard
+  Gui, Add, Button, yp+30 xm+680 w115 h22 vCopyExif gCopyExif, Copy to clipboard
   Gui, Add, Button, yp xp+121 w86 h22 vPasteExif gPasteExif, Paste to File
-  Gui, Add, Button, yp+36 xm+680 w207 h20 vShowExif gShowExif, Show all &Exif tags
+  Gui, Add, Button, yp+42 xm+680 w207 h20 vShowExif gShowExif, Show all &Exif tags
   ;Gui, Add, Button, ym+40 xm+904 h36 w40 vCopyExif gCopyExif, Copy
   ;Gui, Add, Button, yp+43 xm+904 h36 w40 vPasteExif gPasteExif, Paste
 Gui, Tab
@@ -240,10 +260,10 @@ Loop {
 		GuiControl,, PhotoView,	; empty control
 		GuiControl,, ExifEditfield,	; empty control
 		ExtGuiNeedUpdate = 2
-		if (not ExtGuiHasBeenOpened and FocusedRowNumber and not GuiExpanded)
-			Gosub ExpandGui				; open the view-photo tab if first time a file has been selected
+		If (not ExtGuiHasBeenOpened and FocusedRowNumber and not GuiExpanded)
+			Gosub ExpandGuiToggle				; open the view-photo tab if first time a file has been selected
 	} else if (ExtGuiNeedUpdate >= 1 and GuiExpanded = 1 and (ExtGUITabs = 1 or ExtGUITabs = 2)) {		; update photo view only if FocusedRowNumber = OldFocusedRowNumber (avoid slowing down moving selection in the GUI)
-		if (ExtGuiNeedUpdate >= 2)
+		If (ExtGuiNeedUpdate >= 2)
 			Gosub UpdatePhotoView
 		Gosub UpdateExifView
 		ExtGuiNeedUpdate = 0
@@ -271,46 +291,91 @@ FindFocused:
 return
 
 ; --------------- add new file to listview (+write GE coordinates if auto-mode checked) ----------
-AddFileToList:
+AddJPGFileToList:
   Gui, Submit, NoHide
   If (AutoMode) and IsGErunning() {
 	logmsg := WriteExif(PointLatitude, PointLongitude, PointAltitude)
   } else {
 	Gosub ReadExif
   }
+  FilesAdded++
   LV_Add("", File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
+  SB_SetText(FilesAdded " files added.")  ; update statusbar
+  LV_ModifyCol(1)  ; Auto-size column to fit its contents.
+  LV_ModifyCol(6)
+return
+
+AddListFileToList:
+  Loop, Read, %Folder%\%File%
+  {
+	ListLatitude =
+	ListLongitude =
+	ListAltitude =
+	StringSplit, word, A_LoopReadLine, |
+	If not FileExist(word1) {
+		SplitPath, word1, File, Folder
+		logmsg := "file missing"
+	} else {
+		SplitPath, word1, File, Folder
+		ListLatitude := word2
+		ListLongitude := word3
+		ListAltitude := word4
+		logmsg := ""
+	}
+	FilesAdded++
+	LV_Add("", File, ListLatitude, ListLongitude, ListAltitude, logmsg, Folder)
+	SB_SetText(FilesAdded " files added.")  ; update statusbar
+	LV_ModifyCol(1)  ; Auto-size column to fit its contents.
+	LV_ModifyCol(6)
+  }
 return
 
 ; ------------ read Exif GPS data from file ----------------
 ReadExif:
-  GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)
-  logmsg := "read Exif failed"
-  If (FileLatitude != "") and (FileLongitude != "") 
-	logmsg := "read Exif ok"
+  FileLatitude =
+  FileLongitude =
+  FileAltitude =
+  If FileExist(Folder "\" File) {
+	GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)
+	logmsg := "read Exif failed"
+	If (FileLatitude != "") and (FileLongitude != "") 
+		logmsg := "read Exif ok"
+  } else {
+	logmsg := "file missing"
+  }
 return
 
 ; ----------- write Exif GPS data to file ---------------
 WriteExif(WriteLatitude, WriteLongitude, WriteAltitude="") {
   global ; make function able to read File/Filder/exiv2path, and able to write to FileLatitude/FileLongitude/FileAltitude without needing lots of extra parameters
-  IfEqual WriteAltitude
-	SB_SetText("Writing coordinates " WriteLatitude ", " WriteLongitude " to file " File )  ; update statusbar
-  Else
-	SB_SetText("Writing coordinates " WriteLatitude ", " WriteLongitude " (" WriteAltitude "m)" " to file " File )  ; update statusbar
-  SetPhotoLatLongAlt(Folder "\" File, WriteLatitude, WriteLongitude, WriteAltitude, exiv2path)
-  GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)	; read Exif back from photo to make sure write operation succeded
-  If (Dec2Deg(FileLatitude) = Dec2Deg(WriteLatitude)) and (Dec2Deg(FileLongitude) = Dec2Deg(WriteLongitude) and (WriteAltitude = FileAltitude or WriteAltitude = ""))    ; cannot compare directly without Dec2Deg() as 41.357892/41.357893 both equal 41° 21' 28.41'' N etc..
-	return "write Exif ok"
-  else
-	return "write Exif failed"
+  FileLatitude =
+  FileLongitude =
+  FileAltitude =
+  If FileExist(Folder "\" File) {
+	  IfEqual WriteAltitude
+		SB_SetText("Writing coordinates " WriteLatitude ", " WriteLongitude " to file " File )  ; update statusbar
+	  Else
+		SB_SetText("Writing coordinates " WriteLatitude ", " WriteLongitude " (" WriteAltitude "m)" " to file " File )  ; update statusbar
+	  SetPhotoLatLongAlt(Folder "\" File, WriteLatitude, WriteLongitude, WriteAltitude, exiv2path)
+	  GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)	; read Exif back from photo to make sure write operation succeded
+	  If (Dec2Deg(FileLatitude) = Dec2Deg(WriteLatitude)) and (Dec2Deg(FileLongitude) = Dec2Deg(WriteLongitude) and (WriteAltitude = FileAltitude or WriteAltitude = ""))    ; cannot compare directly without Dec2Deg() as 41.357892/41.357893 both equal 41° 21' 28.41'' N etc..
+		return "write Exif ok"
+	  else
+		return "write Exif failed"
+  } else {
+	SB_SetText("Cannot write coordinates: File " File " is missing!")  ; update statusbar
+	return "file missing"
+  }
 }
 
 ; =================================================== functions for GUI buttons ============================================================
 
 AddFiles:
   Gui +OwnDialogs
-  FileSelectFile, SelectedFiles, M3,, Open JPEG files..., JPEG files (*.jpg; *.jpeg)
+  FileSelectFile, SelectedFiles, M3,, Open JPEG files..., JPEG files (*.jpg; *.jpeg; *.PhotoTagList)
   If SelectedFiles =
 	return
+  FilesAdded = 0
   Loop, parse, SelectedFiles, `n
   {
 	If (A_Index = 1) {
@@ -318,27 +383,25 @@ AddFiles:
 		Continue
 	}
 	File := A_LoopField
-	Gosub AddFileToList
-	LV_ModifyCol(1)  ; Auto-size column to fit its contents.
-	LV_ModifyCol(6)
-	SB_SetText(A_Index " files added.")  ; update statusbar
+	SplitPath, File, , , Ext
+	If (Ext = "PhotoTagList")
+		Gosub AddListFileToList
+	else
+		Gosub AddJPGFileToList
   }
 return
 
 Clear:
   LV_Delete() ; delete all rows in listview
-  SB_SetText("Clear...")  ; update statusbar
+  SB_SetText("Clear list..")  ; update statusbar
 ;  If (GuiExpanded)
-;	Gosub ExpandGui
+;	Gosub ExpandGuiToggle
 return
 
 Reread:
   Loop % LV_GetCount()
   {
 	LV_GetText(File, A_Index, 1)
-	LV_GetText(ListLatitude, A_Index, 2)
-	LV_GetText(ListLongitude, A_Index, 3)
-	LV_GetText(ListAltitude, A_Index, 4)
 	LV_GetText(Folder, A_Index, 6)
 	Gosub ReadExif
 	LV_Modify(A_Index, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
@@ -354,10 +417,41 @@ OpenPhoto:
 	Run %Folder%\%File%    ; open jpeg in default application
 return
 
+SaveList:
+  If (LV_GetCount() = 0)
+	return
+  FileSelectFile, SaveListFileName, S18,, Save File-list to..., PhotoTagList (*.PhotoTagList)
+  If not (SaveListFileName)
+	return
+  SplitPath SaveListFileName, , , Ext
+  If not (Ext) {
+	SaveListFileName := SaveListFileName ".PhotoTagList"
+	If FileExist(SaveListFileName) {
+		MsgBox, 4, Overwrite file?, Overwrite %SaveListFileName%?
+		IfMsgBox, No, return
+	}
+  }
+  FileList :=
+  Loop % LV_GetCount()
+  {
+	LV_GetText(File, A_Index, 1)
+	LV_GetText(ListLatitude, A_Index, 2)
+	LV_GetText(ListLongitude, A_Index, 3)
+	LV_GetText(ListAltitude, A_Index, 4)
+	LV_GetText(Folder, A_Index, 6)
+	ThisEntry := Folder "\" File "|" ListLatitude "|" ListLongitude "|" ListAltitude
+	FileList := FileList ThisEntry "`n"
+  }
+  FileDelete, %SaveListFileName%
+  FileAppend, %FileList%, %SaveListFileName%
+  FileList :=
+return
+
 ShowExif:
   Gosub FindFocused
   IfEqual File
 	return
+  ExifData :=
   GetExif(Folder "\" File, ExifData, exiv2path)
   Gui 3:Destroy
   Gui 3:+Owner
@@ -374,13 +468,18 @@ DeleteExif:
   Gosub FindFocused
   IfEqual File
 	return
-  SB_SetText("Deleting Exif GPS data from " File )  ; update statusbar
-  ErasePhotoLatLong(Folder "\" File, exiv2path)
-  Gosub ReadExif
-  logmsg = delete failed
-  If not FileLatitude and not FileLongitude and not FileAltitude
-	logmsg = delete Exif ok
-  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
+  If FileExist(Folder "\" File) {
+	SB_SetText("Deleting Exif GPS data from " File )  ; update statusbar
+	ErasePhotoLatLong(Folder "\" File, exiv2path)
+	Gosub ReadExif
+	logmsg = delete failed
+	If not FileLatitude and not FileLongitude and not FileAltitude
+		logmsg = delete Exif ok
+	LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
+  } else {
+	SB_SetText("Cannot delete Exif data: File " File " is missing!")  ; update statusbar
+	LV_Modify(FocusedRowNumber, Col1, File, "", "", "", "file missing", Folder)
+  }
   GuiControl,,EditLatitude,
   GuiControl,,EditLongitude,
   GuiControl,,EditAltitude,
@@ -389,14 +488,23 @@ return
 CopyExif:
   Gui, Submit, NoHide
   clipboard := "GPS|" EditLatitude "|" EditLongitude "|" EditAltitude
-  SB_SetText("Copy coordinates " EditLatitude ", " EditLongitude " (" EditAltitude "m)" " to clipboard.")
+  If (EditAltitude)
+	SB_SetText("Copy coordinates " EditLatitude ", " EditLongitude " (" EditAltitude "m)" " to clipboard.")
+  else
+	SB_SetText("Copy coordinates " EditLatitude ", " EditLongitude " to clipboard.")
 return
 
 PasteExif:
+  If (clipboard = "GPS|||") {
+	Gosub DeleteExif
+	return
+  }
   Loop, parse, clipboard, |,
   {
-	If (A_Index = 1 and A_LoopField != "GPS")
+	If (A_Index = 1 and A_LoopField != "GPS") {
+		SB_SetText("Clipboard does not contain coordinates.")
 		return
+	}
 	If (A_Index = 2)
 		GuiControl,,EditLatitude, %A_LoopField%
 	If (A_Index = 3)
@@ -445,34 +553,27 @@ return
 ; ==========================================================================================================================
 
 GuiDropFiles:
+  FilesAdded = 0
   Loop, parse, A_GuiEvent, `n
   {
 	If InStr(FileExist(A_LoopField), "D") {   ; if dragged item is a directory loop to add all jpg files
 		Loop %A_LoopField%\*.jpg,,1
 		{
 			SplitPath A_LoopFileFullPath, File, Folder, Ext
-			Gosub AddFileToList
-			LV_ModifyCol(1)  ; Auto-size column to fit its contents.
-			LV_ModifyCol(6)
-			SB_SetText(A_Index " files added.")  ; update statusbar
+			Gosub AddJPGFileToList
 		}
 		Loop %A_LoopField%\*.jpeg,,1
 		{
 			SplitPath A_LoopFileFullPath, File, Folder, Ext
-			Gosub AddFileToList
-			LV_ModifyCol(1)  ; Auto-size column to fit its contents.
-			LV_ModifyCol(6)
-			SB_SetText(A_Index " files added.")  ; update statusbar
+			Gosub AddJPGFileToList
 		}
 		Continue
 	}
 	SplitPath A_LoopField, File, Folder, Ext
-	If (Ext = "jpg" or Ext = "jpeg") {
-		Gosub AddFileToList
-		LV_ModifyCol(1)  ; Auto-size column to fit its contents.
-		LV_ModifyCol(6)
-	}
-	SB_SetText(A_Index " files added.")  ; update statusbar
+	If (Ext = "jpg" or Ext = "jpeg")
+		Gosub AddJPGFileToList
+	else if (Ext = "PhotoTagList")
+		Gosub AddListFileToList
   }
 return
 
@@ -513,6 +614,7 @@ return
 
 UpdateExifView:
   If(File) {
+	ExifData :=
 	GetExif(Folder "\" File, ExifData, exiv2path)
 	GuiControl,, ExifEditfield, Filename:  %File%  (%Folder%)`n==================================================`n%ExifData%  ; Put the text into the control.
   } else {
@@ -520,16 +622,16 @@ UpdateExifView:
   }
 return
 
-ExpandGui:
+ExpandGuiToggle:
   If (GuiExpanded) {
 	Gui Show, w668, Google Earth PhotoTag %version%
-	GuiControl, Text, ExpandGui, &>>
+	GuiControl, Text, ExpandGuiToggle, &>>
 	GuiControl,, PhotoView,	; empty controls
 	GuiControl,, ExifEditfield,
 	GuiExpanded = 0
-  } else  {
+  } else {
 	Gui Show, w977, Google Earth PhotoTag %version%
-	GuiControl, Text, ExpandGui, &<<
+	GuiControl, Text, ExpandGuiToggle, &<<
 	GuiExpanded = 1
 	ExtGuiNeedUpdate = 2
   }
@@ -537,7 +639,7 @@ ExpandGui:
 return
 
 GuiContextMenu:
-  if A_GuiControl != ListView 		; don't show right-click menu it click was in listview
+  If (A_GuiControl != "ListView") 		; don't show right-click menu it click was in listview
 	Menu, context, Show
 return
 
@@ -618,4 +720,106 @@ Assoc:
   RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite\command , , "%A_ScriptFullPath%" /SavePos "`%1"
   RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite , , Write Google Earth coordinates to file
   MsgBox,, Registry Options, You can now right-click JPEG files to read/save GPS coordinates
+return
+
+; ==========================================================================================================================
+
+KMLOpen:
+  If (LV_GetCount() = 0)
+	return
+  KMLfile := A_Temp "\PhotoTag.kml"
+  Gui, Submit, NoHide
+  Gosub KMLWrite
+  Run, %A_Temp%\PhotoTag.kml,,UseErrorLevel
+return
+
+KMLSave:
+  If (LV_GetCount() = 0)
+	return
+  FileSelectFile, KMLFile, S18,, Save KML to.., KML files (*.kml)
+  If not (KMLFile)
+	return
+  SplitPath KMLFile, , , Ext
+  If not (Ext) {
+	KMLFile := KMLFile ".kml"
+	If FileExist(KMLFile) {
+		MsgBox, 4, Overwrite file?, Overwrite %KMLFile%?
+		IfMsgBox, No, return
+	}
+  }
+  Gui, Submit, NoHide
+  Gosub KMLWrite
+return
+
+KMLWrite:
+  FileDelete, %KMLfile%
+  FileRead, KMLstyle, %A_ScriptDir%\%KMLstylename%.PlacemarkStyle
+  KMLhead =
+  (
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://earth.google.com/kml/2.2">
+<Document>
+	<name>Photos</name>
+%KMLstyle%
+  )
+  KMLtail := "</Document></kml>"
+  FilesInList := LV_GetCount()
+  FileNr = 0
+  Loop %FilesInList%   {
+	LV_GetText(File, A_Index, 1)
+	LV_GetText(ListLatitude, A_Index, 2)
+	LV_GetText(ListLongitude, A_Index, 3)
+	LV_GetText(ListAltitude, A_Index, 4)
+	LV_GetText(Folder, A_Index, 6)
+	If not FileExist(Folder "\" File)
+		Continue
+	FileDescription := FileDescription(Folder "\" File)
+	FileNr++
+	PrevID := FileNr - 1
+	NextID := FileNr + 1
+	IfEqual, FilesInList, %FileNr%
+		NextID := 1
+	ThisEntry = 
+	(
+	<Placemark id="phototag%FileNr%">
+		<name><![CDATA[%File%]]></name>
+		<Snippet></Snippet>
+		<LookAt><latitude>%ListLatitude%</latitude><longitude>%ListLongitude%</longitude><altitude>0</altitude><range>5000</range><tilt>0</tilt><heading>0</heading><altitudeMode>relativeToGround</altitudeMode></LookAt>
+		<styleUrl>#phototag_style1</styleUrl>
+		<ExtendedData>
+			<Data name="prev"><value>phototag%PrevID%</value></Data> 
+			<Data name="next"><value>phototag%NextID%</value></Data>
+			<Data name="FileName"><value><![CDATA[%File%]]></value></Data>
+			<Data name="FullPath"><value><![CDATA[%Folder%\%File%]]></value></Data>
+			<Data name="FileDescription"><value><![CDATA[%FileDescription%]]></value></Data>
+			<Data name="PhotoWidth"><value>560</value></Data>
+		</ExtendedData>
+		<Point><coordinates>%ListLongitude%,%ListLatitude%,%ListAltitude%</coordinates></Point>
+	</Placemark>
+	)
+	KMLmain := KMLmain "`t" ThisEntry "`n"
+	KMLlinestring := KMLlinestring " " ListLongitude "," ListLatitude
+  }
+  KMLroute = 
+  (
+	<Placemark>
+		<name>Route</name>
+		<LineString>
+			<tessellate>1</tessellate>
+			<coordinates>%KMLlinestring%</coordinates>
+		</LineString>
+	</Placemark>
+  )
+  ;StringReplace, KMLmain, KMLmain, `n, , All
+  ;StringReplace, KMLmain, KMLmain, %A_Tab%, , All
+  FileAppend, %KMLhead%, %KMLfile%
+  FileAppend, %KMLmain%, %KMLfile%
+  If (RouteLine)
+	FileAppend, %KMLroute%, %KMLfile%
+  FileAppend, %KMLtail%, %KMLfile%
+  KMLhead =
+  KMLmain =
+  KMLtail =
+  KMLlinestring = 
+  KMLroute =
 return
