@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ; 
 ; Version history:
+; 1.06   -   add crosshair KML option to menu (thanks http://freegeographytools.com/2008/easy-ways-to-get-latitudelongitude-for-a-screen-point-in-google-earth)
 ; 1.05   -   use new _libGoogleEarth.ahk library 1.15 (fix for localized OS)
 ; 1.04   -   * add option to disable reading altitude (sometimes slows down the Google Earth client) *
 ; 1.03   -   * add six mini-bookmarks * add tooltips *
@@ -25,7 +26,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.05
+version = 1.06
 
 Speed := 1.0
 OnTop := 1
@@ -36,6 +37,8 @@ ReadAlt := 0
 Menu, context, add, Always On Top, OnTop
 Menu, context, add, Round values, RoundVal
 Menu, context, add, Read Altitude, ReadAlt
+Menu, context, add,
+Menu, context, add, Show Crosshair, Crosshair
 Menu, context, add,
 Menu, context, add, About, About
 If OnTop
@@ -283,6 +286,32 @@ return
 OnTop:
   Menu, context, ToggleCheck, %A_ThisMenuItem%
   Winset, AlwaysOnTop, Toggle, A
+return
+
+Crosshair:
+  RegRead GoogleEarthPath, HKEY_LOCAL_MACHINE, SOFTWARE\Google\Google Earth Plus, InstallDir
+  IfExist, %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
+	CrosshairImage = %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
+  Else
+	CrosshairImage = %A_ProgramFiles%\Google\Google Earth\res\shapes\cross-hairs_highlight.png
+  CrosshairKml =
+  (
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://earth.google.com/kml/2.2">
+<ScreenOverlay>
+	<name>crosshair</name>
+	<Icon>
+		<href>%CrosshairImage%</href>
+	</Icon>
+	<overlayXY x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+	<screenXY x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+	<size x="32" y="32" xunits="pixels" yunits="pixels"/>
+</ScreenOverlay>
+</kml>
+  )
+  FileDelete, %A_Temp%\crosshair.kml
+  FileAppend, %CrosshairKml%, %A_Temp%\crosshair.kml
+  Run, %A_Temp%\crosshair.kml
 return
 
 RoundVal:
