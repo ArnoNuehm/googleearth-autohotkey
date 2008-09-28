@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ; 
 ; Version history:
+; 1.07   -   smaller crosshair in GE 4.3
 ; 1.06   -   add crosshair KML option to menu (thanks http://freegeographytools.com/2008/easy-ways-to-get-latitudelongitude-for-a-screen-point-in-google-earth)
 ; 1.05   -   use new _libGoogleEarth.ahk library 1.15 (fix for localized OS)
 ; 1.04   -   * add option to disable reading altitude (sometimes slows down the Google Earth client) *
@@ -26,7 +27,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.06
+version = 1.07
 
 Speed := 1.0
 OnTop := 1
@@ -290,7 +291,9 @@ return
 
 Crosshair:
   RegRead GoogleEarthPath, HKEY_LOCAL_MACHINE, SOFTWARE\Google\Google Earth Plus, InstallDir
-  IfExist, %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
+  IfExist, %GoogleEarthPath%\res\cursor_crosshair_thick.png
+	CrosshairImage = %GoogleEarthPath%\res\cursor_crosshair_thick.png
+  Else IfExist, %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
 	CrosshairImage = %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
   Else
 	CrosshairImage = %A_ProgramFiles%\Google\Google Earth\res\shapes\cross-hairs_highlight.png
