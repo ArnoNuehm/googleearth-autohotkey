@@ -15,6 +15,7 @@
 ; 
 ; Needs _libGoogleEarth.ahk library:  http://david.tryse.net/googleearth/
 ; 
+; 1.06   -   use new _libGoogleEarth.ahk library 1.17 (handle "16 degrees 17 min, 56 secs south and 36 degrees 23 mins 44secs east")
 ; 1.05   -   use new _libGoogleEarth.ahk library (handles Deg Min and Deg format as well as Deg Min Sec)
 ; 1.03   -   always-on-top option
 
@@ -22,7 +23,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.05
+version = 1.06
 
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop
@@ -116,8 +117,8 @@ About:
   Gui 2:Add,Text,xm+10 yp+15, DMS formats:
   Gui 2:Font,CGray
   Gui 2:Add,Text,xm+20 yp+15, 8:32:54S,119:29:28E
-  Gui 2:Add,Text,xm+20 yp+15, 8 deg 32' 54.73" South	119 deg 29' 28.98" East
-  Gui 2:Add,Text,xm+20 yp+15, 8°32'54.73"S, 119°29'28.98"E
+  Gui 2:Add,Text,xm+20 yp+15, 8deg 32min 54.7sec South, 119deg 29min 28.9sec East
+  Gui 2:Add,Text,xm+20 yp+15, 8° 32' 54.73"S	119° 29' 28.98"E
   Gui 2:Font
   Gui 2:Add,Text,xm yp+22, License: GPLv2+
   Gui 2:Add,Text,xm yp+26, Check for updates here:
