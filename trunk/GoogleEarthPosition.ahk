@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ; 
 ; Version history:
+; 1.08   -   hold down shift to copy comma separated
 ; 1.07   -   smaller crosshair in GE 4.3
 ; 1.06   -   add crosshair KML option to menu (thanks http://freegeographytools.com/2008/easy-ways-to-get-latitudelongitude-for-a-screen-point-in-google-earth)
 ; 1.05   -   use new _libGoogleEarth.ahk library 1.15 (fix for localized OS)
@@ -27,7 +28,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.07
+version = 1.08
 
 Speed := 1.0
 OnTop := 1
@@ -91,6 +92,10 @@ SavedPos3_TT := "Click to load a previously saved position.`nPress Shift and cli
 SavedPos4_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
 SavedPos5_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
 SavedPos6_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
+Copy_LatLong_TT := "Copy Latitude and Longitude to the clipboard (separated by a tab) `n(hold down Shift to copy separated by a comma)"
+Copy_LatLong_KML_TT := "Copy Latitude and Longitude to the clipboard in KML format "
+Copy_LookAt_TT := "Copy LookAt parameters (current viewpoint) to the clipboard (tab separated)`n(hold down Shift to copy comma separated)"
+Copy_LookAt_KML_TT := "Copy LookAt parameters (current viewpoint) to the clipboard in KML format"
 
 ;Gui, Add, Text, x10, DMS Coordinates:
 ;Gui, Add, Edit, x10 w100 ReadOnly, %A_Space%DMS Coordinates:
@@ -198,11 +203,19 @@ FlyTo:
 return
 
 Copy_LatLong:
-  clipboard = %FocusPointLatitude%`t%FocusPointLongitude%
+  GetKeyState, shiftstate, Shift
+  If (shiftstate = "D")
+	clipboard = %FocusPointLatitude%, %FocusPointLongitude%
+  Else
+  	clipboard = %FocusPointLatitude%`t%FocusPointLongitude%
 return
 
 Copy_LookAt:
-  clipboard = %FocusPointLatitude%`t%FocusPointLongitude%`t%FocusPointAltitude%`t%Range%`t%Tilt%`t%Azimuth%
+  GetKeyState, shiftstate, Shift
+  If (shiftstate = "D")
+	clipboard = %FocusPointLatitude%, %FocusPointLongitude%, %FocusPointAltitude%, %Range%, %Tilt%, %Azimuth%
+  Else
+	clipboard = %FocusPointLatitude%`t%FocusPointLongitude%`t%FocusPointAltitude%`t%Range%`t%Tilt%`t%Azimuth%
 return
 
 Copy_LatLong_KML:
