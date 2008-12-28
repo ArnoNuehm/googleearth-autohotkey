@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.16
+; _libGoogleEarth.ahk  version 1.17
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.17   -   update ImageDim() to use byref parameters, update Deg2Dec() to understand "degrees", "minutes", "seconds" etc.
 ; 1.16   -   added FileDescription() function (only reads descript.ion atm, not jpeg comment)
 ; 1.15   -   Fix for localized OS with "," instead of "." as decimal separator (thanks Antti Rasi)
 ; 1.14   -   remake Deg2Dec() to understand when Lat and Long are different format - one is Deg Min and one Deg Min Sec etc.
@@ -91,12 +92,25 @@ WS_Exec(VBCode)
 ;    8:32:54S,119:29:28E
 ; Output: -8.548333, 119.491383
 Deg2Dec(DegCoord, mode = "both") {
-	StringReplace DegCoord,DegCoord,deg,%A_Space%,All	; replace all possible separators with space before StringSplit
+	StringReplace DegCoord,DegCoord,and,%A_Space%,All	; replace all possible separators with space before StringSplit
+	StringReplace DegCoord,DegCoord,`,,%A_Space%,All
+	StringReplace DegCoord,DegCoord,degrees,%A_Space%,All
+	StringReplace DegCoord,DegCoord,degree,%A_Space%,All
+	StringReplace DegCoord,DegCoord,degs,%A_Space%,All
+	StringReplace DegCoord,DegCoord,deg,%A_Space%,All
 	StringReplace DegCoord,DegCoord,d,%A_Space%,All
 	StringReplace DegCoord,DegCoord,°,%A_Space%,All
+	StringReplace DegCoord,DegCoord,minutes,%A_Space%,All
+	StringReplace DegCoord,DegCoord,minute,%A_Space%,All
+	StringReplace DegCoord,DegCoord,mins,%A_Space%,All
+	StringReplace DegCoord,DegCoord,min,%A_Space%,All
+	StringReplace DegCoord,DegCoord,m,%A_Space%,All
 	StringReplace DegCoord,DegCoord,',%A_Space%,All
+	StringReplace DegCoord,DegCoord,seconds,%A_Space%,All
+	StringReplace DegCoord,DegCoord,second,%A_Space%,All
+	StringReplace DegCoord,DegCoord,secs,%A_Space%,All
+	StringReplace DegCoord,DegCoord,sec,%A_Space%,All
 	StringReplace DegCoord,DegCoord,`",%A_Space%,All
-	StringReplace DegCoord,DegCoord,`,,%A_Space%,All
 	StringReplace DegCoord,DegCoord,:,%A_Space%,All
 	StringReplace DegCoord,DegCoord,S,%A_Space%S		; add space before south/west/north/east to separate as a new word
 	StringReplace DegCoord,DegCoord,N,%A_Space%N
@@ -419,16 +433,23 @@ GetExif(fullfilename, byref StrOut, toolpath = "exiv2.exe") {
 	captureOutput(CMD, StrOut)
 }
 
-ImageDim(fullfilename, ImageMagickTool = "", skipifnoIM = "0") {
+ImageDim(fullfilename, byref ImgWidth, byref ImgHeight, ImageMagickTool = "", skipifnoIM = "0") {
 	IfNotExist %fullfilename%
 		return 2
 	SplitPath fullfilename, filename, dir
 	If not (ImageMagickTool)
 		ImageMagickTool := findFile("identify.exe")
 	If (ImageMagickTool) {
-		CMD := COMSPEC " /C " ImageMagickTool " -ping -format ""%w x %h"" """ fullfilename """"
+		CMD := COMSPEC " /C " ImageMagickTool " -ping -format ""%wx%hx"" """ fullfilename """" ; shows 640x480x - 2nd x to avoid including linefeed when splitting string below
 		captureOutput(CMD, StrOut)
-		return StrOut
+		If (SubStr(StrOut, 1, 12) == "identify.exe") {
+			return 3
+		} else {
+			StringSplit, ImgXYtmp, StrOut, x ; split string on x
+			ImgWidth = %ImgXYtmp1%
+			ImgHeight = %ImgXYtmp2%
+			return 0
+		}
 	} else if not (skipifnoIM) {
 		DHW:=A_DetectHiddenWindows
 		DetectHiddenWindows, ON
@@ -437,10 +458,10 @@ ImageDim(fullfilename, ImageMagickTool = "", skipifnoIM = "0") {
 		Gui, 99:Show,Hide w2592 h2592, ImageWxH.Temporary.GUI
 		Gui, 99:Add, Picture, x0 y0 , %fullfilename%
 		Gui, 99:Show,AutoSize Hide, ImageWxH.Temporary.GUI
-		WinGetPos, , ,w,h, ImageWxH.Temporary.GUI
+		WinGetPos, , ,ImgWidth,ImgHeight, ImageWxH.Temporary.GUI
 		Gui, 99:Destroy
 		DetectHiddenWindows, %DHW%
-		Return w " x " h
+		return 0
 	}
 }
 
