@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.17
+; _libGoogleEarth.ahk  version 1.18
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.18   -   fix IsGErunning() for Google Earth Pro / add GEtimePlay() & GEtimePause() functions to control time-slider (GE builtin time-control is hidden when recording movies)
 ; 1.17   -   update ImageDim() to use byref parameters, update Deg2Dec() to understand "degrees", "minutes", "seconds" etc.
 ; 1.16   -   added FileDescription() function (only reads descript.ion atm, not jpeg comment)
 ; 1.15   -   Fix for localized OS with "," instead of "." as decimal separator (thanks Antti Rasi)
@@ -261,7 +262,7 @@ Dec2Rel(DecCoord, mode = "both") {
 
 ; simple check if the Google Earth client is running or not
 IsGErunning() {
-	SetTitleMatchMode 3
+	SetTitleMatchMode 2	; change from 3 to 2 to match also Google Earth Pro etc.
 	If WinExist("Google Earth") and WinExist("ahk_class QWidget")
 	    return 1
 	return 0
