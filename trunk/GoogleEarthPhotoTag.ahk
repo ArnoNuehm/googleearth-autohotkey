@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.17   -   use new _libGoogleEarth.ahk library 1.18 (fix for Google Earth Pro)
 ; 1.16   -   make KML file * save/load file+coord lists (*.PhotoTagList) * error handling on missing files
 ; 1.15   -   use new _libGoogleEarth.ahk library 1.15 (fix for localized OS)
 ; 1.14   -   add Edit Exif tab
@@ -35,7 +36,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.16
+version = 1.17
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
