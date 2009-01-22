@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ; 
 ; Version history:
+; 1.09   -   use new _libGoogleEarth.ahk library 1.18 (fix for Google Earth Pro)
 ; 1.08   -   hold down shift to copy comma separated
 ; 1.07   -   smaller crosshair in GE 4.3
 ; 1.06   -   add crosshair KML option to menu (thanks http://freegeographytools.com/2008/easy-ways-to-get-latitudelongitude-for-a-screen-point-in-google-earth)
@@ -28,7 +29,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.08
+version = 1.09
 
 Speed := 1.0
 OnTop := 1
