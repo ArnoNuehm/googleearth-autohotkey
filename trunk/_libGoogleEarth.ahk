@@ -46,6 +46,7 @@ VBCode =
    Dim Azimuth
    Dim Speed
    Dim pointPos
+   Dim googleEarthTime
   
    Function testGe()
 	Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
@@ -67,6 +68,16 @@ VBCode =
 	Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
 	Set pointPos = googleEarth.GetPointOnTerrainFromScreenCoords(0,0)
 	gePoint = pointPos.Latitude & ":" & pointPos.Longitude & ":" & pointPos.Altitude & ":" & pointPos.ProjectedOntoGlobe & ":" & pointPos.ZeroElevationExaggeration & ":"
+   end Function
+
+   Function geTimePlay()
+	Set googleEarthTime = CreateObject("GoogleEarth.AnimationControllerGE")
+	googleEarthTime.Play()
+   end Function
+
+   Function geTimePause()
+	Set googleEarthTime = CreateObject("GoogleEarth.AnimationControllerGE")
+	googleEarthTime.Pause()
    end Function
 
 )
@@ -262,7 +273,7 @@ Dec2Rel(DecCoord, mode = "both") {
 
 ; simple check if the Google Earth client is running or not
 IsGErunning() {
-	SetTitleMatchMode 2	; change from 3 to 2 to match also Google Earth Pro etc.
+	SetTitleMatchMode 2	; change from 3 to 2 to match also Google Earth Pro etc. - thanks Marty Michener
 	If WinExist("Google Earth") and WinExist("ahk_class QWidget")
 	    return 1
 	return 0
@@ -327,6 +338,20 @@ FlyToPhoto(fullfilename, range = 50000, tilt = 0, azimuth = 0) {
 	GetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, xRange, xTilt, xAzimuth)
 	GetPhotoLatLong(fullfilename, FocusPointLatitude, FocusPointLongitude)
 	SetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth, Speed)
+}
+
+;call with GEtimePlay()
+GEtimePlay() {
+	wsfunction = geSetPos(%FocusPointLatitude%, %FocusPointLongitude%, %FocusPointAltitude%, %FocusPointAltitudeMode%, %Range%, %Tilt%, %Azimuth%, %Speed%)
+	WS_Eval(returnval, "geTimePlay()")
+	return returnval
+}
+
+;call with GEtimePause()
+GEtimePause() {
+	wsfunction = geSetPos(%FocusPointLatitude%, %FocusPointLongitude%, %FocusPointAltitude%, %FocusPointAltitudeMode%, %Range%, %Tilt%, %Azimuth%, %Speed%)
+	WS_Eval(returnval, "geTimePause()")
+	return returnval
 }
 
 ; ================================================================== JPEG EXIF GPS FUNCTIONS ==================================================================
