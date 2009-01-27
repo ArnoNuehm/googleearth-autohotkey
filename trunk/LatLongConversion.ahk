@@ -15,6 +15,7 @@
 ; 
 ; Needs _libGoogleEarth.ahk library:  http://david.tryse.net/googleearth/
 ; 
+; 1.07   -   remember window position
 ; 1.06   -   use new _libGoogleEarth.ahk library 1.17 (handle "16 degrees 17 min, 56 secs south and 36 degrees 23 mins 44secs east")
 ; 1.05   -   use new _libGoogleEarth.ahk library (handles Deg Min and Deg format as well as Deg Min Sec)
 ; 1.03   -   always-on-top option
@@ -23,7 +24,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.06
+version = 1.07
 
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop
@@ -46,7 +47,8 @@ Gui, Add, Button, y150 x210 w35 h50, &<<
 Gui, Add, Button, y325 x10 w100 , Copy_De&grees
 Gui, Add, Button, y325 x255 w100 , Copy_De&cimal
 
-Gui, Show,, LatLong Conversion %version%
+WinPos := GetSavedWinPos("LatLongConversion")
+Gui, Show, %WinPos%, LatLong Conversion %version%
 Gui +LastFound
 return
 
@@ -98,8 +100,22 @@ GuiContextMenu:
 return
 
 GuiClose:
-  WS_Uninitialize()
+  SaveWinPos("LatLongConversion")
 ExitApp
+
+SaveWinPos(HKCUswRegkey) {	; add SaveWinPos("my_program") in "GuiClose:" routine
+  WinGetPos, X, Y, , , A  ; "A" to get the active window's pos.
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\%HKCUswRegkey%, WindowX, %X%
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\%HKCUswRegkey%, WindowY, %Y%
+}
+
+GetSavedWinPos(HKCURegkey) {	; add WinPos := GetSavedWinPos("my_program") before "Gui, Show, %WinPos%,.." command
+  RegRead, WindowX, HKEY_CURRENT_USER, SOFTWARE\%HKCURegkey%, WindowX
+  RegRead, WindowY, HKEY_CURRENT_USER, SOFTWARE\%HKCURegkey%, WindowY
+  If ((WindowX+200) > A_ScreenWidth or (WindowY+200) > A_ScreenHeight or WindowX < 0 or WindowY < 0)
+	return "Center"
+  return "X" WindowX " Y" WindowY
+}
 
 About:
   Gui 2:Destroy
