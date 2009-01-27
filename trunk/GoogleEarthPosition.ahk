@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ; 
 ; Version history:
+; 1.10   -   remember window position
 ; 1.09   -   use new _libGoogleEarth.ahk library 1.18 (fix for Google Earth Pro)
 ; 1.08   -   hold down shift to copy comma separated
 ; 1.07   -   smaller crosshair in GE 4.3
@@ -29,7 +30,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.09
+version = 1.10
 
 Speed := 1.0
 OnTop := 1
@@ -105,8 +106,8 @@ Copy_LookAt_KML_TT := "Copy LookAt parameters (current viewpoint) to the clipboa
 Gui Add, StatusBar, vStatusBar
 SB_SetText("  Google Earth is not running ")
 
-
-Gui, Show,, Google Earth Position %version%
+WinPos := GetSavedWinPos("GoogleEarthPosition")
+Gui, Show, %WinPos%, Google Earth Position %version%
 Gui +LastFound
 WinSet AlwaysOnTop
 OnMessage(0x200, "WM_MOUSEMOVE")
@@ -269,8 +270,7 @@ SavePos:
 return
 
 
-WM_MOUSEMOVE()
-{
+WM_MOUSEMOVE() {
     static CurrControl, PrevControl, _TT  ; _TT is kept blank for use by the ToolTip command below.
     CurrControl := A_GuiControl
     If (CurrControl <> PrevControl and not InStr(CurrControl, " "))
@@ -350,8 +350,23 @@ GuiContextMenu:
 return
 
 GuiClose:
+  SaveWinPos("GoogleEarthPosition")
   WS_Uninitialize()
 ExitApp
+
+SaveWinPos(HKCUswRegkey) {	; add SaveWinPos("my_program") in "GuiClose:" routine
+  WinGetPos, X, Y, , , A  ; "A" to get the active window's pos.
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\%HKCUswRegkey%, WindowX, %X%
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\%HKCUswRegkey%, WindowY, %Y%
+}
+
+GetSavedWinPos(HKCURegkey) {	; add WinPos := GetSavedWinPos("my_program") before "Gui, Show, %WinPos%,.." command
+  RegRead, WindowX, HKEY_CURRENT_USER, SOFTWARE\%HKCURegkey%, WindowX
+  RegRead, WindowY, HKEY_CURRENT_USER, SOFTWARE\%HKCURegkey%, WindowY
+  If ((WindowX+200) > A_ScreenWidth or (WindowY+200) > A_ScreenHeight or WindowX < 0 or WindowY < 0)
+	return "Center"
+  return "X" WindowX " Y" WindowY
+}
 
 About:
   Gui 2:Destroy
