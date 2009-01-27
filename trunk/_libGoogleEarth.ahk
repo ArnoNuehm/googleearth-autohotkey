@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.18
+; _libGoogleEarth.ahk  version 1.19
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.19   -   new functions : GetJPEGComment, SetJPEGComment, WriteFileDescription, SetXmpTag, GetXmpTag
 ; 1.18   -   fix IsGErunning() for Google Earth Pro / add GEtimePlay() & GEtimePause() functions to control time-slider (GE builtin time-control is hidden when recording movies)
 ; 1.17   -   update ImageDim() to use byref parameters, update Deg2Dec() to understand "degrees", "minutes", "seconds" etc.
 ; 1.16   -   added FileDescription() function (only reads descript.ion atm, not jpeg comment)
@@ -372,7 +373,7 @@ GetPhotoLatLongAlt(fullfilename, byref FocusPointLatitude, byref FocusPointLongi
 		FocusPointLatitude	:= Deg2Dec(Pos,"lat")
 		FocusPointLongitude	:= Deg2Dec(Pos,"long")
 	} else {
-		CMD := COMSPEC " /C " toolpath " -Pkt """ fullfilename """"
+		CMD := COMSPEC " /C " toolpath " -u -Pkt """ fullfilename """"
 		captureOutput(CMD, StrOut)
 		Loop, parse, StrOut, `n`r
 		{
@@ -437,7 +438,8 @@ SetPhotoLatLongAlt(fullfilename, FocusPointLatitude, FocusPointLongitude, FocusP
 	Else
 		CMD := COMSPEC " /C " toolpath " -M""set Exif.GPSInfo.GPSVersionID 2 2 0 0"" -M""set Exif.GPSInfo.GPSLatitude " LatRel """ -M""set Exif.GPSInfo.GPSLatitudeRef " LatRef """ -M""set Exif.GPSInfo.GPSLongitude " LongRel """ -M""set Exif.GPSInfo.GPSLongitudeRef " LongRef """ -M""set Exif.GPSInfo.GPSAltitude " AltRel """ -M""set Exif.GPSInfo.GPSAltitudeRef 0"" """ fullfilename """"
 	If captureOutput(CMD, StrOut) != 1
-		Msgbox, 48, Error, %StrOut%`n`nCommand line:`n`n%CMD%
+		return 1
+		;Msgbox, 48, Error, %StrOut%`n`nCommand line:`n`n%CMD%
 }
 
 ;call with ErasePhotoLatLong(fullfilename)
@@ -447,16 +449,81 @@ ErasePhotoLatLong(fullfilename, toolpath = "exiv2.exe") {
 	SplitPath fullfilename, filename, dir
 	CMD := COMSPEC " /C " toolpath " -M""del Exif.GPSInfo.GPSVersionID"" -M""del Exif.GPSInfo.GPSLatitude"" -M""del Exif.GPSInfo.GPSLatitudeRef"" -M""del Exif.GPSInfo.GPSLongitude"" -M""del Exif.GPSInfo.GPSLongitudeRef"" -M""del Exif.GPSInfo.GPSAltitudeRef"" -M""del Exif.GPSInfo.GPSAltitude"" -M""del Exif.GPSInfo.GPSTrack"" """ fullfilename """"
 	If captureOutput(CMD, StrOut) != 1
-		Msgbox, 48, Error, %StrOut%`n`nCommand line:`n`n%CMD%
+		return 1
 }
 
-;call with GetExif(fullfilename, ExifDataOutputVar), then use msgbox %ExifDataOutputVar% etc..
+; ================================================================== OTHER JPEG EXIF/XMP etc. FUNCTIONS ==================================================================
+
+;call with GetExif(fullfilename, ExifDataOutputVar)
 GetExif(fullfilename, byref StrOut, toolpath = "exiv2.exe") {
 	IfNotExist %fullfilename%
 		return 2
 	SplitPath fullfilename, filename, dir
 	CMD := COMSPEC " /C " toolpath " -Pkt """ fullfilename """"
 	captureOutput(CMD, StrOut)
+}
+
+;call with GetJPEGComment(fullfilename, JPEGCommentOutputVar)
+GetJPEGComment(fullfilename, byref StrOut, toolpath = "exiv2.exe") {
+	IfNotExist %fullfilename%
+		return 2
+	SplitPath fullfilename, filename, dir
+	CMD := COMSPEC " /C " toolpath " -pc """ fullfilename """"
+	captureOutput(CMD, StrOut)
+	StrOut := RegExReplace(StrOut, "\r\n$", "") ; strip newline at the end
+}
+
+;call with SetJPEGComment(fullfilename, newComment)
+SetJPEGComment(fullfilename, newComment, toolpath = "exiv2.exe") {
+	IfNotExist %fullfilename%
+		return 2
+	SplitPath fullfilename, filename, dir
+	IfEqual, newComment,
+	{
+		CMD := COMSPEC " /C " toolpath " -dc """ fullfilename """"	; delete comment
+		captureOutput(CMD, StrOut)
+		IfNotEqual, StrOut,
+			return 1
+	}
+	StringReplace, newComment, newComment, `", \`", All		; add \ before any double quotes
+	CMD := COMSPEC " /C " toolpath " -c """ newComment """ """ fullfilename """"
+	captureOutput(CMD, StrOut)
+	IfNotEqual, StrOut,
+		return 1
+}
+
+;call with SetXmpTag(fullfilename, tagname, tagdata)
+SetXmpTag(fullfilename, tagname, tagdata, toolpath = "exiv2.exe") {
+	IfNotExist %fullfilename%
+		return 2
+	SplitPath fullfilename, filename, dir
+	StringReplace, tagname, tagname, `", \`", All		; add \ before any double quotes
+	StringReplace, tagdata, tagdata, `", \`", All		; add \ before any double quotes
+	IfEqual, tagdata,
+		CMD := COMSPEC " /C " toolpath " -M""del Xmp.xmp." tagname """ """ fullfilename """"	; delete tag
+	Else
+		CMD := COMSPEC " /C " toolpath " -M""set Xmp.xmp." tagname " " tagdata """ """ fullfilename """"
+	captureOutput(CMD, StrOut)
+	IfNotEqual, StrOut,
+		return 1
+}
+
+;call with GetXmpTag(fullfilename, tagname, XMPtagOutputVar)
+GetXmpTag(fullfilename, tagname, byref XMPtagOutputVar, toolpath = "exiv2.exe") {
+	IfNotExist %fullfilename%
+		return 2
+	SplitPath fullfilename, filename, dir
+	StringReplace, tagname, tagname, `", \`", All		; add \ before any double quotes
+	CMD := COMSPEC " /C " toolpath " -px """ fullfilename """"
+	captureOutput(CMD, StrOut)
+	XMPtagOutputVar =
+	Loop, parse, StrOut, `n`r
+	{
+		If (SubStr(A_LoopField, 1, 9+StrLen(tagname)) = "Xmp.xmp." tagname " ") {
+			XMPtagOutputVar := SubStr(A_LoopField, 60)
+			XMPtagOutputVar = %XMPtagOutputVar%
+		}
+	}
 }
 
 ImageDim(fullfilename, byref ImgWidth, byref ImgHeight, ImageMagickTool = "", skipifnoIM = "0") {
@@ -491,19 +558,42 @@ ImageDim(fullfilename, byref ImgWidth, byref ImgHeight, ImageMagickTool = "", sk
 	}
 }
 
-; read file description (only descript.ion atm, not jpeg comment)
+; read file description (from descript.ion file)
 FileDescription(FileFullname) {
   SplitPath, FileFullname, Name, Dir
   FileRead, DescriptIon, %Dir%\descript.ion
-  If RegExMatch(DescriptIon, "m)^""?" Name """?(.*)", Descr)
+  If RegExMatch(DescriptIon, "m)^""?" Name """?[ \t]*(.*)", Descr)	; find line with file description (w/wo quotes around filename)
 	return Descr1
-  ;Loop, read, %Dir%\descript.ion
-  ;{
-	;If RegExMatch(A_LoopReadLine, "m)^""?" Name """?(.*)", Descr)
-	;	return Descr1
-	;If RegExMatch(A_LoopReadLine, "^""?" Name """?(.*)", Descr)
-	;	return Descr1
-  ;}	
+}
+
+; write file description (to descript.ion file)
+WriteFileDescription(FileFullname, newDescription) {
+  SplitPath, FileFullname, Name, Dir
+  DescriptIonFile := Dir "\descript.ion"
+  StringReplace, newDescription, newDescription, `r`n, , All		; drop linefeeds
+  newDescription = %newDescription% 	; trim start/end spaces
+  IfEqual, newDescription,			; wipe current description
+  {
+	FileRead, DescriptIon, %DescriptIonFile%
+	DescriptIon := RegExReplace(DescriptIon, "m)^""?" Name """?[ \t]*(.*)", "", ReplacementsDone)	; blank line with current description (w/wo quotes on filename)
+	if (ReplacementsDone) {
+		StringReplace, DescriptIon, DescriptIon, `r`n`r`n, `r`n, All 		; drop double linefeeds
+		FileDelete, %DescriptIonFile%
+		FileAppend, %DescriptIon%, %DescriptIonFile%
+	}
+  } else if (not FileExist(DescriptIonFile)) {		; if no descript.ion file just append description to new file
+	ThisDescriptIon := """" Name """" " " newDescription "`r`n"
+	FileAppend, %ThisDescriptIon%, %DescriptIonFile%
+  } else {		; description exists - replace
+	ThisDescriptIon := """" Name """" " " newDescription
+	FileRead, DescriptIon, %DescriptIonFile%
+	DescriptIon := RegExReplace(DescriptIon, "m)^""?" Name """?[ \t]*(.*)", ThisDescriptIon, ReplacementsDone)	; replace line with current description (w/wo quotes on filename)
+	if (ReplacementsDone = 0)
+		DescriptIon := DescriptIon "`r`n" ThisDescriptIon "`r`n"		; if no description currently add line at the end
+	StringReplace, DescriptIon, DescriptIon, `r`n`r`n, `r`n, All 		; drop double linefeeds
+	FileDelete, %DescriptIonFile%
+	FileAppend, %DescriptIon%, %DescriptIonFile%
+  }
 }
 
 ; ================================================================== INTERNAL FUNCTIONS ==================================================================
