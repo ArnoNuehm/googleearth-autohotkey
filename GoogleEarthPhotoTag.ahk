@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.19   -   option to disable autosizing of columns, swap description and folder columns, remember always-on-top and autosize-col options, better keyboard shortcuts
 ; 1.18   -   edit jpeg file comment / descript.ion file comment (select description source with context menu), "show crosshair" option, Vista fix, remember window position
 ; 1.17   -   use new _libGoogleEarth.ahk library 1.18 (fix for Google Earth Pro)
 ; 1.16   -   make KML file * save/load file+coord lists (*.PhotoTagList) * error handling on missing files
@@ -37,7 +38,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.18
+version = 1.19
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -133,13 +134,19 @@ CommentSrcDesc := "Description (descript.ion file)"
 RegRead CommentSrc, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, CommentSrc
 IfEqual, CommentSrc,
 	CommentSrc := CommentSrcJPEG		; default description type to use if none found in registry
-OnTop := 0
+RegRead AutosizeCol, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, Autosize Columns
+IfEqual, AutosizeCol,
+	AutosizeCol := 1
+RegRead OnTop, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, OnTop
+IfEqual, OnTop,
+	OnTop := 0
 ReadAlt := 0
 Menu, commentSrc, Add, %CommentSrcJPEG%, MenuCommentSrc
 Menu, commentSrc, Add, %CommentSrcDesc%, MenuCommentSrc
 Menu, context, add, Always On Top, OnTop
 Menu, context, add, Read Altitude, ReadAlt
-Menu, context, Add, Photo Description, :commentSrc
+Menu, context, add, Autosize Columns, AutosizeCol
+Menu, context, add, Photo Description, :commentSrc
 Menu, context, add,
 Menu, context, add, Show Crosshair, Crosshair
 Menu, context, add,
@@ -149,19 +156,21 @@ If OnTop
 	Menu, context, Check, Always On Top
 If ReadAlt
 	Menu, context, Check, Read Altitude
+If AutosizeCol
+	Menu, context, Check, Autosize Columns
 gosub PickCommentSrc
 
 ; ================================================================================ create GUI ================================================================================
 Gui, Add, Button, ym xm vAddFiles gAddFiles w74, &Add Files...
 Gui, Add, Text, yp+3 xp+77 , (also drag-and-drop)
-Gui, Add, Button, yp-3 xp+108 vClear gClear, &Clear List
+Gui, Add, Button, yp-3 xp+108 vClear gClear, Clear List
 Gui, Add, Button, yp xp+59 vReread gReread, &Reread Exif
 Gui, Add, Text, ym+2 xm+324 , Google Earth coordinates:
 Gui, Add, Edit, yp-2 xp+128 w73 +ReadOnly vPointLatitude,
 Gui, Add, Edit, yp-0 xp+74  w73 +ReadOnly vPointLongitude,
 Gui, Add, Edit, yp-0 xp+74  w50 +ReadOnly vPointAltitudeM,
 
-Gui, Add, ListView, -Multi xm+0 yp+30 w650 h175 AltSubmit vListView gListView, File|Latitude|Longitude|Altitude|Log|Folder|Description ; 11 rows - set height with h175 instead of r11 as it makes listview too tall on Vista - thanks Marty Michener for bug report
+Gui, Add, ListView, -Multi xm+0 yp+30 w650 h175 AltSubmit vListView gListView, File|Latitude|Longitude|Altitude|Log|Description|Folder ; 11 rows - set height with h175 instead of r11 as it makes listview too tall on Vista - thanks Marty Michener for bug report
 LV_ModifyCol(2, "Integer")  ; For sorting purposes, indicate that column is an integer.
 LV_ModifyCol(3, "Integer")
 LV_ModifyCol(4, "Integer")
@@ -170,7 +179,7 @@ Gui, Add, Button, ym+210 xm+0 vOpenPhoto gOpenPhoto default, &Open photo
 Gui, Add, Button, yp xp+80 vSaveList gSaveList, Save List
 Gui, Add, Button, yp xm+262 vFlyTo gFlyTo, &Fly to this photo in Google Earth
 Gui, Add, Button, yp xp+167 vSavePos gSavePos, &Save Google Earth coordinates to this photo
-Gui, Add, Button, yp x0 hidden vreload greload, reloa&d
+;Gui, Add, Button, yp x0 hidden vreload greload, reloa&d		; XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX comment out in release build
 
 Gui, Font, bold
 Gui, Add, Checkbox, yp+30 xm+6 vAutoMode, %A_Space%Auto-Mode 
@@ -191,7 +200,7 @@ Gui, Add, Checkbox, yp h24 xp+110 vRouteLine Checked, Route-line
 
 Gui, Add, GroupBox, yp-16 xm+658 w305 h46, Description
 Gui, Add, Edit, yp+16 xp+10 w236 vComment,
-Gui, Add, Button, yp-1 xp+242 w46 gCommentSave, Save
+Gui, Add, Button, yp-1 xp+242 w46 gCommentSave, Sa&ve
 
 Gui, Add, Tab2, w305 h256 xm+658 ym vExtGUITabs AltSubmit, Show Photo|Show Exif|Edit Exif
   Gui, Add, Picture, w291 h218 xm+665 ym+29 vPhotoView,
@@ -200,16 +209,16 @@ Gui, Tab, 2
   Gui, Add, Edit, t64 vExifEditfield +ReadOnly -Wrap -WantReturn w291 h218 xm+665 ym+29 
   Gui, Font,
 Gui, Tab, 3
-  Gui, Add, Text, ym+42 xm+670, Latitude:
+  Gui, Add, Text, ym+42 xm+670, Latit&ude:
   Gui, Add, Edit, yp-2 xp+57 w160 vEditLatitude,
   Gui, Add, Text, yp+31 xm+670, Longitude:
   Gui, Add, Edit, yp-2 xp+57 w160 vEditLongitude,
   Gui, Add, Text, yp+31 xm+670, Altitude:
   Gui, Add, Edit, yp-2 xp+57 w160 vEditAltitude,
-  Gui, Add, Button, yp+32 xm+727 vSaveEdit gSaveEdit, Save to File
+  Gui, Add, Button, yp+32 xm+727 vSaveEdit gSaveEdit, Sav&e to File
   Gui, Add, Button, yp xp+74 vDeleteExif gDeleteExif, Delete GPS-tag
-  Gui, Add, Button, yp+30 xm+680 w115 h22 vCopyExif gCopyExif, Copy to clipboard
-  Gui, Add, Button, yp xp+121 w86 h22 vPasteExif gPasteExif, Paste to File
+  Gui, Add, Button, yp+30 xm+680 w115 h22 vCopyExif gCopyExif, &Copy to clipboard
+  Gui, Add, Button, yp xp+121 w86 h22 vPasteExif gPasteExif, &Paste to File
   Gui, Add, Button, yp+42 xm+680 w207 h20 vShowExif gShowExif, Show all &Exif tags
 Gui, Tab
 
@@ -219,11 +228,13 @@ LV_ModifyCol(2, 80)
 LV_ModifyCol(3, 80)
 LV_ModifyCol(4, 60)
 LV_ModifyCol(5, 90)
-LV_ModifyCol(6, 133)
-LV_ModifyCol(7, 80)
+LV_ModifyCol(6, 80)
+LV_ModifyCol(7, 133)
 WinPos := GetSavedWinPos("GoogleEarthPhotoTag")
-Gui Show, w668 %WinPos%, Google Earth PhotoTag %version%		; w1018 is starting expanded
+Gui Show, w668 %WinPos%, Google Earth PhotoTag %version%		; w1018 if starting expanded
 Gui, +LastFound
+If OnTop
+	WinSet AlwaysOnTop
 GuiExpanded = 0
 
 ; ================================================================================ continous loop to track Google Earth coordinates ================================================================================
@@ -288,8 +299,8 @@ FindFocused:
   ListLatitude =
   ListLongitude =
   ListAltitude =
-  Folder =
   ListComment =
+  Folder =
   FocusedRowNumber := LV_GetNext(0, "F")  ; Find the focused row.
   If not FocusedRowNumber   ; No row is focused.
 	return
@@ -297,8 +308,8 @@ FindFocused:
   LV_GetText(ListLatitude, FocusedRowNumber, 2)
   LV_GetText(ListLongitude, FocusedRowNumber, 3)
   LV_GetText(ListAltitude, FocusedRowNumber, 4)
-  LV_GetText(Folder, FocusedRowNumber, 6)
-  LV_GetText(ListComment, FocusedRowNumber, 7)
+  LV_GetText(ListComment, FocusedRowNumber, 6)
+  LV_GetText(Folder, FocusedRowNumber, 7)
 return
 
 ; --------------- add new file to listview (+write GE coordinates if auto-mode checked) ----------
@@ -311,11 +322,13 @@ AddJPGFileToList:
 	Gosub ReadExif
   }
   FilesAdded++
-  LV_Add("", File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder,FileComment)
+  LV_Add("", File, FileLatitude, FileLongitude, FileAltitude, logmsg, FileComment, Folder)
   SB_SetText(FilesAdded " files added.")  ; update statusbar
-  LV_ModifyCol(1)  ; Auto-size column to fit its contents.
-  LV_ModifyCol(6)
-  LV_ModifyCol(7)
+  If (AutosizeCol = 1) {
+	LV_ModifyCol(1, "AutoHdr")  ; Auto-size column to fit its contents.
+	LV_ModifyCol(6, "AutoHdr")
+	LV_ModifyCol(7, "AutoHdr")
+  }
 return
 
 AddListFileToList:
@@ -338,11 +351,13 @@ AddListFileToList:
 		logmsg := ""
 	}
 	FilesAdded++
-	LV_Add("", File, ListLatitude, ListLongitude, ListAltitude, logmsg, Folder, ListComment)
+	LV_Add("", File, ListLatitude, ListLongitude, ListAltitude, logmsg, ListComment, Folder)
 	SB_SetText(FilesAdded " files added.")  ; update statusbar
-	LV_ModifyCol(1)  ; Auto-size column to fit its contents.
-	LV_ModifyCol(6)
-	LV_ModifyCol(7)
+	If (AutosizeCol = 1) {
+		LV_ModifyCol(1, "AutoHdr")  ; Auto-size column to fit its contents.
+		LV_ModifyCol(6, "AutoHdr")
+		LV_ModifyCol(7, "AutoHdr")
+	}
   }
 return
 
@@ -454,14 +469,16 @@ Reread:
   Loop % LV_GetCount()
   {
 	LV_GetText(File, A_Index, 1)
-	LV_GetText(Folder, A_Index, 6)
+	LV_GetText(Folder, A_Index, 7)
 	Gosub ReadExif
-	LV_Modify(A_Index, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder, FileComment)
+	LV_Modify(A_Index, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, FileComment, Folder)
 	SB_SetText("Exif data re-read for " A_Index " files.")  ; update statusbar
   }
-  LV_ModifyCol(1)  ; Auto-size column to fit its contents.
-  LV_ModifyCol(6)
-  LV_ModifyCol(7)
+  If (AutosizeCol = 1) {
+	LV_ModifyCol(1, "AutoHdr")  ; Auto-size column to fit its contents.
+	LV_ModifyCol(6, "AutoHdr")
+	LV_ModifyCol(7, "AutoHdr")
+  }
 return
 
 OpenPhoto:
@@ -492,8 +509,8 @@ SaveList:
 	LV_GetText(ListLatitude, A_Index, 2)
 	LV_GetText(ListLongitude, A_Index, 3)
 	LV_GetText(ListAltitude, A_Index, 4)
-	LV_GetText(Folder, A_Index, 6)
-	LV_GetText(ListComment, A_Index, 7)
+	LV_GetText(ListComment, A_Index, 6)
+	LV_GetText(Folder, A_Index, 7)
 	ThisEntry := Folder "\" File "|" ListLatitude "|" ListLongitude "|" ListAltitude "|" ListComment
 	FileList := FileList ThisEntry "`n"
   }
@@ -530,7 +547,7 @@ DeleteExif:
 	logmsg = delete failed
 	If not FileLatitude and not FileLongitude and not FileAltitude
 		logmsg = delete Exif ok
-	LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder)
+	LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, ListComment, Folder)
   } else {
 	SB_SetText("Cannot delete Exif data: File " File " is missing!")  ; update statusbar
 	LV_Modify(FocusedRowNumber, Col1, File, "", "", "", "file missing", Folder)
@@ -572,7 +589,7 @@ PasteExif:
   }
   Gui, Submit, NoHide
   logmsg := WriteExif(EditLatitude, EditLongitude, EditAltitude)
-  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder, ListComment)
+  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, ListComment, Folder)
 return
 
 SaveEdit:
@@ -581,7 +598,7 @@ SaveEdit:
   IfEqual File
 	return
   logmsg := WriteExif(EditLatitude, EditLongitude, EditAltitude)
-  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder, ListComment)
+  LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, ListComment, Folder)
 return
 
 FlyTo:
@@ -600,7 +617,7 @@ SavePos:
 	IfEqual File
 		return
 	logmsg := WriteExif(PointLatitude, PointLongitude, PointAltitude)
-	LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, Folder, ListComment)
+	LV_Modify(FocusedRowNumber, Col1, File, FileLatitude, FileLongitude, FileAltitude, logmsg, ListComment, Folder)
 	GuiControl,,EditLatitude, %FileLatitude%
 	GuiControl,,EditLongitude, %FileLongitude%
 	GuiControl,,EditAltitude, %FileAltitude%
@@ -617,7 +634,11 @@ CommentSave:
   IfEqual File
 	return
   logmsg := WriteComment(Comment)
-  LV_Modify(FocusedRowNumber, Col1, File, ListLatitude, ListLongitude, ListAltitude, logmsg, Folder, FileComment)
+  LV_Modify(FocusedRowNumber, Col1, File, ListLatitude, ListLongitude, ListAltitude, logmsg, FileComment, Folder)
+  If (AutosizeCol = 1) {
+	LV_ModifyCol(6, "AutoHdr") ; autosize column
+	LV_ModifyCol(7, "AutoHdr")
+  }
 return
 
 ; ==========================================================================================================================
@@ -654,11 +675,19 @@ return
 OnTop:
   Menu, context, ToggleCheck, %A_ThisMenuItem%
   Winset, AlwaysOnTop, Toggle, A
+  OnTop := (OnTop - 1)**2	; toggle value 1/0
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, OnTop, %OnTop%
 return
 
 ReadAlt:
   Menu, context, ToggleCheck, %A_ThisMenuItem%
   ReadAlt := (ReadAlt - 1)**2	; toggle value 1/0
+return
+
+AutosizeCol:
+  Menu, context, ToggleCheck, %A_ThisMenuItem%
+  AutosizeCol := (AutosizeCol - 1)**2	; toggle value 1/0
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, Autosize Columns, %AutosizeCol%
 return
 
 ListView:
@@ -717,6 +746,7 @@ MenuCommentSrc:
 	CommentSrc := A_ThisMenuItem
 	gosub PickCommentSrc
 	RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, CommentSrc, %CommentSrc%
+	gosub Reread
 return
 
 PickCommentSrc:
@@ -900,8 +930,8 @@ KMLWrite:
 	LV_GetText(ListLatitude, A_Index, 2)
 	LV_GetText(ListLongitude, A_Index, 3)
 	LV_GetText(ListAltitude, A_Index, 4)
-	LV_GetText(Folder, A_Index, 6)
-	LV_GetText(ListComment, A_Index, 7)
+	LV_GetText(ListComment, A_Index, 6)
+	LV_GetText(Folder, A_Index, 7)
 	If not FileExist(Folder "\" File)
 		Continue
 	FileNr++
