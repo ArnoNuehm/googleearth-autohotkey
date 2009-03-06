@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.20   -   option to keep current Google Earth viewpoint altitude when flying to new location
 ; 1.19   -   option to disable autosizing of columns, swap description and folder columns, remember always-on-top and autosize-col options, better keyboard shortcuts
 ; 1.18   -   edit jpeg file comment / descript.ion file comment (select description source with context menu), "show crosshair" option, Vista fix, remember window position
 ; 1.17   -   use new _libGoogleEarth.ahk library 1.18 (fix for Google Earth Pro)
@@ -38,7 +39,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.19
+version = 1.20
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -61,6 +62,9 @@ IfEqual exiv2path
 		RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, exiv2path, %exiv2path%
 	}
 }
+RegRead KeepAlt, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, KeepEyeAlt
+IfEqual, KeepAlt,
+	KeepAlt := 0
 
 ; ---------------- handle command line parameters ("photo-filename" = fly to, "/SavePos photo-filename" = write coordinates) -------------------
 If 0 > 0
@@ -110,7 +114,12 @@ If 0 > 0
 				Msgbox,48, Read Coordinates, Error: No Exif GPS data in file: %filename% %FileLatitude%, %FileLongitude%
 			} else {
 				If IsGErunning() {
-					SetGEpos(FileLatitude, FileLongitude, 0, 2, 10000, 0, 0)
+					If (KeepAlt) {
+						GetGEpos(PointLatitude, PointLongitude, PointAltitude, AltitudeMode, NewRange, Tilt, Azimuth)	; needed just to have Range when flying to photo
+					} else {
+						NewRange := 10000
+					}
+					SetGEpos(FileLatitude, FileLongitude, 0, 1, NewRange, 0, 0)
 					Msgbox,, Read Coordinates, Locating coordinates %FileLatitude%`,%FileLongitude% in Google Earth..., 2
 				} else {
 					Msgbox,48, Read Coordinates, Error: Google Earth is not running - cannot fly to coordinates %FileLatitude%`,%FileLongitude%.
@@ -144,7 +153,8 @@ ReadAlt := 0
 Menu, commentSrc, Add, %CommentSrcJPEG%, MenuCommentSrc
 Menu, commentSrc, Add, %CommentSrcDesc%, MenuCommentSrc
 Menu, context, add, Always On Top, OnTop
-Menu, context, add, Read Altitude, ReadAlt
+Menu, context, add, Read Surface Elevation, ReadAlt
+Menu, context, add, Navigating keeps Eye-Altitude, KeepAlt
 Menu, context, add, Autosize Columns, AutosizeCol
 Menu, context, add, Photo Description, :commentSrc
 Menu, context, add,
@@ -156,6 +166,8 @@ If OnTop
 	Menu, context, Check, Always On Top
 If ReadAlt
 	Menu, context, Check, Read Altitude
+If KeepAlt
+	Menu, context, Check, Navigating keeps Eye-Altitude
 If AutosizeCol
 	Menu, context, Check, Autosize Columns
 gosub PickCommentSrc
@@ -604,8 +616,16 @@ return
 FlyTo:
   If IsGErunning() {
 	Gosub FindFocused
+	If (KeepAlt) {
+		If (ReadAlt) {	; in this case we don't have the Range at the moment
+			GetGEpos(PointLatitude, PointLongitude, PointAltitude, AltitudeMode, Range, Tilt, Azimuth)
+		}
+		NewRange := Range
+	} else {
+		NewRange := 10000
+	}
 	IfNotEqual File
-		SetGEpos(ListLatitude, ListLongitude, 0, 2, 10000, 0, 0)
+		SetGEpos(ListLatitude, ListLongitude, 0, 1, NewRange, 0, 0)
   } else {
 	SB_SetText(" Google Earth is not running.")  ; update statusbar
   }
@@ -682,6 +702,12 @@ return
 ReadAlt:
   Menu, context, ToggleCheck, %A_ThisMenuItem%
   ReadAlt := (ReadAlt - 1)**2	; toggle value 1/0
+return
+
+KeepAlt:
+  Menu, context, ToggleCheck, %A_ThisMenuItem%
+  KeepAlt := (KeepAlt - 1)**2	; toggle value 1/0
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, KeepEyeAlt, %KeepAlt%
 return
 
 AutosizeCol:
