@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ; 
 ; Version history:
+; 1.11   -   remember always-on-top
 ; 1.10   -   remember window position
 ; 1.09   -   use new _libGoogleEarth.ahk library 1.18 (fix for Google Earth Pro)
 ; 1.08   -   hold down shift to copy comma separated
@@ -30,10 +31,12 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.10
+version = 1.11
 
+RegRead OnTop, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition, OnTop
+IfEqual, OnTop,
+	OnTop := 1
 Speed := 1.0
-OnTop := 1
 RoundVal := 1
 ReadAlt := 0
 
@@ -109,7 +112,8 @@ SB_SetText("  Google Earth is not running ")
 WinPos := GetSavedWinPos("GoogleEarthPosition")
 Gui, Show, %WinPos%, Google Earth Position %version%
 Gui +LastFound
-WinSet AlwaysOnTop
+If OnTop
+	WinSet AlwaysOnTop
 OnMessage(0x200, "WM_MOUSEMOVE")
 
 Loop {
@@ -301,6 +305,8 @@ return
 OnTop:
   Menu, context, ToggleCheck, %A_ThisMenuItem%
   Winset, AlwaysOnTop, Toggle, A
+  OnTop := (OnTop - 1)**2	; toggle value 1/0
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition, OnTop, %OnTop%
 return
 
 Crosshair:
