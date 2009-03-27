@@ -1,0 +1,32 @@
+	<Style id="phototag_style1">
+		<IconStyle>
+			<Icon>
+				<href>http://maps.google.com/mapfiles/kml/shapes/camera.png</href>
+			</Icon>
+			<scale>1.0</scale>
+		</IconStyle>
+		<LabelStyle>
+			<color>AAFFFFFF</color>
+			<scale>0.7</scale>
+		</LabelStyle>
+		<BalloonStyle>
+			<bgColor>FFFFFFFF</bgColor>
+			<text><![CDATA[
+<center>
+<font color="#777777">$[FileName]</font><br><br>
+<img src="$[FullPath]" width="$[PhotoWidth]">
+<br>
+<font color="#000000">$[FileDescription]</font>
+<br><br>
+<div>
+	<table width="300"></table>
+	<a href="#$[prev];balloon"><font size='+1' color='#000000'><b>Previous Photo</b></font></a>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+	<a href="#$[next];balloon"><font size='+1' color='#000000'><b>Next Photo</b></font></a>
+	<br><br>
+	<a href='http://code.google.com/p/googleearth-autohotkey/'><font color='#999999'>This kml was made with Google Earth PhotoTag</font></a>
+</div>
+</center>
+			]]></text>
+		</BalloonStyle>
+	</Style>
