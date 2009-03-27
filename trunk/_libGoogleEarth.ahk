@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.19
+; _libGoogleEarth.ahk  version 1.20
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.20   -   fix for exiv2.exe in path containing space (thanks Jim Smith for bug report)
 ; 1.19   -   new functions : GetJPEGComment, SetJPEGComment, WriteFileDescription, SetXmpTag, GetXmpTag
 ; 1.18   -   fix IsGErunning() for Google Earth Pro / add GEtimePlay() & GEtimePause() functions to control time-slider (GE builtin time-control is hidden when recording movies)
 ; 1.17   -   update ImageDim() to use byref parameters, update Deg2Dec() to understand "degrees", "minutes", "seconds" etc.
@@ -373,7 +374,7 @@ GetPhotoLatLongAlt(fullfilename, byref FocusPointLatitude, byref FocusPointLongi
 		FocusPointLatitude	:= Deg2Dec(Pos,"lat")
 		FocusPointLongitude	:= Deg2Dec(Pos,"long")
 	} else {
-		CMD := COMSPEC " /C " toolpath " -u -Pkt """ fullfilename """"
+		CMD := """" toolpath """ -u -Pkt """ fullfilename """"
 		captureOutput(CMD, StrOut)
 		Loop, parse, StrOut, `n`r
 		{
@@ -434,9 +435,9 @@ SetPhotoLatLongAlt(fullfilename, FocusPointLatitude, FocusPointLongitude, FocusP
 	LongRel := Dec2Rel(FocusPointLatitude ", " FocusPointLongitude, "long")
 	AltRel := Round(FocusPointAltitude * 100,0) "/100"
 	IfEqual FocusPointAltitude
-		CMD := COMSPEC " /C " toolpath " -M""set Exif.GPSInfo.GPSVersionID 2 2 0 0"" -M""set Exif.GPSInfo.GPSLatitude " LatRel """ -M""set Exif.GPSInfo.GPSLatitudeRef " LatRef """ -M""set Exif.GPSInfo.GPSLongitude " LongRel """ -M""set Exif.GPSInfo.GPSLongitudeRef " LongRef """ -M""del Exif.GPSInfo.GPSAltitudeRef"" -M""del Exif.GPSInfo.GPSAltitude"" """ fullfilename """"
+		CMD := """" toolpath """ -M""set Exif.GPSInfo.GPSVersionID 2 2 0 0"" -M""set Exif.GPSInfo.GPSLatitude " LatRel """ -M""set Exif.GPSInfo.GPSLatitudeRef " LatRef """ -M""set Exif.GPSInfo.GPSLongitude " LongRel """ -M""set Exif.GPSInfo.GPSLongitudeRef " LongRef """ -M""del Exif.GPSInfo.GPSAltitudeRef"" -M""del Exif.GPSInfo.GPSAltitude"" """ fullfilename """"
 	Else
-		CMD := COMSPEC " /C " toolpath " -M""set Exif.GPSInfo.GPSVersionID 2 2 0 0"" -M""set Exif.GPSInfo.GPSLatitude " LatRel """ -M""set Exif.GPSInfo.GPSLatitudeRef " LatRef """ -M""set Exif.GPSInfo.GPSLongitude " LongRel """ -M""set Exif.GPSInfo.GPSLongitudeRef " LongRef """ -M""set Exif.GPSInfo.GPSAltitude " AltRel """ -M""set Exif.GPSInfo.GPSAltitudeRef 0"" """ fullfilename """"
+		CMD := """" toolpath """ -M""set Exif.GPSInfo.GPSVersionID 2 2 0 0"" -M""set Exif.GPSInfo.GPSLatitude " LatRel """ -M""set Exif.GPSInfo.GPSLatitudeRef " LatRef """ -M""set Exif.GPSInfo.GPSLongitude " LongRel """ -M""set Exif.GPSInfo.GPSLongitudeRef " LongRef """ -M""set Exif.GPSInfo.GPSAltitude " AltRel """ -M""set Exif.GPSInfo.GPSAltitudeRef 0"" """ fullfilename """"
 	If captureOutput(CMD, StrOut) != 1
 		return 1
 		;Msgbox, 48, Error, %StrOut%`n`nCommand line:`n`n%CMD%
@@ -447,7 +448,7 @@ ErasePhotoLatLong(fullfilename, toolpath = "exiv2.exe") {
 	IfNotExist %fullfilename%
 		return 2
 	SplitPath fullfilename, filename, dir
-	CMD := COMSPEC " /C " toolpath " -M""del Exif.GPSInfo.GPSVersionID"" -M""del Exif.GPSInfo.GPSLatitude"" -M""del Exif.GPSInfo.GPSLatitudeRef"" -M""del Exif.GPSInfo.GPSLongitude"" -M""del Exif.GPSInfo.GPSLongitudeRef"" -M""del Exif.GPSInfo.GPSAltitudeRef"" -M""del Exif.GPSInfo.GPSAltitude"" -M""del Exif.GPSInfo.GPSTrack"" """ fullfilename """"
+	CMD := """" toolpath """ -M""del Exif.GPSInfo.GPSVersionID"" -M""del Exif.GPSInfo.GPSLatitude"" -M""del Exif.GPSInfo.GPSLatitudeRef"" -M""del Exif.GPSInfo.GPSLongitude"" -M""del Exif.GPSInfo.GPSLongitudeRef"" -M""del Exif.GPSInfo.GPSAltitudeRef"" -M""del Exif.GPSInfo.GPSAltitude"" -M""del Exif.GPSInfo.GPSTrack"" """ fullfilename """"
 	If captureOutput(CMD, StrOut) != 1
 		return 1
 }
@@ -459,7 +460,7 @@ GetExif(fullfilename, byref StrOut, toolpath = "exiv2.exe") {
 	IfNotExist %fullfilename%
 		return 2
 	SplitPath fullfilename, filename, dir
-	CMD := COMSPEC " /C " toolpath " -Pkt """ fullfilename """"
+	CMD := """" toolpath """ -Pkt """ fullfilename """"
 	captureOutput(CMD, StrOut)
 }
 
@@ -468,7 +469,7 @@ GetJPEGComment(fullfilename, byref StrOut, toolpath = "exiv2.exe") {
 	IfNotExist %fullfilename%
 		return 2
 	SplitPath fullfilename, filename, dir
-	CMD := COMSPEC " /C " toolpath " -pc """ fullfilename """"
+	CMD := """" toolpath """ -pc """ fullfilename """"
 	captureOutput(CMD, StrOut)
 	StrOut := RegExReplace(StrOut, "\r\n$", "") ; strip newline at the end
 }
@@ -480,13 +481,13 @@ SetJPEGComment(fullfilename, newComment, toolpath = "exiv2.exe") {
 	SplitPath fullfilename, filename, dir
 	IfEqual, newComment,
 	{
-		CMD := COMSPEC " /C " toolpath " -dc """ fullfilename """"	; delete comment
+		CMD := """" toolpath """ -dc """ fullfilename """"	; delete comment
 		captureOutput(CMD, StrOut)
 		IfNotEqual, StrOut,
 			return 1
 	}
 	StringReplace, newComment, newComment, `", \`", All		; add \ before any double quotes
-	CMD := COMSPEC " /C " toolpath " -c """ newComment """ """ fullfilename """"
+	CMD := """" toolpath """ -c """ newComment """ """ fullfilename """"
 	captureOutput(CMD, StrOut)
 	IfNotEqual, StrOut,
 		return 1
@@ -500,9 +501,9 @@ SetXmpTag(fullfilename, tagname, tagdata, toolpath = "exiv2.exe") {
 	StringReplace, tagname, tagname, `", \`", All		; add \ before any double quotes
 	StringReplace, tagdata, tagdata, `", \`", All		; add \ before any double quotes
 	IfEqual, tagdata,
-		CMD := COMSPEC " /C " toolpath " -M""del Xmp.xmp." tagname """ """ fullfilename """"	; delete tag
+		CMD := """" toolpath """ -M""del Xmp.xmp." tagname """ """ fullfilename """"	; delete tag
 	Else
-		CMD := COMSPEC " /C " toolpath " -M""set Xmp.xmp." tagname " " tagdata """ """ fullfilename """"
+		CMD := """" toolpath """ -M""set Xmp.xmp." tagname " " tagdata """ """ fullfilename """"
 	captureOutput(CMD, StrOut)
 	IfNotEqual, StrOut,
 		return 1
@@ -514,7 +515,7 @@ GetXmpTag(fullfilename, tagname, byref XMPtagOutputVar, toolpath = "exiv2.exe") 
 		return 2
 	SplitPath fullfilename, filename, dir
 	StringReplace, tagname, tagname, `", \`", All		; add \ before any double quotes
-	CMD := COMSPEC " /C " toolpath " -px """ fullfilename """"
+	CMD := """" toolpath """ -px """ fullfilename """"
 	captureOutput(CMD, StrOut)
 	XMPtagOutputVar =
 	Loop, parse, StrOut, `n`r
@@ -533,7 +534,7 @@ ImageDim(fullfilename, byref ImgWidth, byref ImgHeight, ImageMagickTool = "", sk
 	If not (ImageMagickTool)
 		ImageMagickTool := findFile("identify.exe")
 	If (ImageMagickTool) {
-		CMD := COMSPEC " /C " ImageMagickTool " -ping -format ""%wx%hx"" """ fullfilename """" ; shows 640x480x - 2nd x to avoid including linefeed when splitting string below
+		CMD := """" ImageMagickTool """ -ping -format ""%wx%hx"" """ fullfilename """" ; shows 640x480x - 2nd x to avoid including linefeed when splitting string below
 		captureOutput(CMD, StrOut)
 		If (SubStr(StrOut, 1, 12) == "identify.exe") {
 			return 3
@@ -600,6 +601,7 @@ WriteFileDescription(FileFullname, newDescription) {
 
 ; function is used internally - run command and return output - call with captureOutput(commandline, outputvar)
 captureOutput(CMD, byref StrOut) {
+	;FileAppend, %CMD%`n, %A_Temp%\ahk_libGoogleEarth.log	; debug XXXXXXXXXXX
 	cmdretDllPath := findFile("cmdret.dll")
 	IfEqual cmdretDllPath
 	{
