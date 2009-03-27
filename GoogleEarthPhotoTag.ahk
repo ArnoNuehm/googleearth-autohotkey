@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.21   -   use new _libGoogleEarth.ahk library 1.20 (fix for exiv2.exe in path containing space), fix balloon-style for GE5
 ; 1.20   -   option to keep current Google Earth viewpoint altitude when flying to new location
 ; 1.19   -   option to disable autosizing of columns, swap description and folder columns, remember always-on-top and autosize-col options, better keyboard shortcuts
 ; 1.18   -   edit jpeg file comment / descript.ion file comment (select description source with context menu), "show crosshair" option, Vista fix, remember window position
@@ -39,7 +40,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.20
+version = 1.21
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -893,7 +894,7 @@ Crosshair:
   CrosshairKml =
   (
 <?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://earth.google.com/kml/2.2">
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
 <ScreenOverlay>
 	<name>crosshair</name>
 	<Icon>
@@ -943,8 +944,9 @@ KMLWrite:
   KMLhead =
   (
 <?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://earth.google.com/kml/2.2">
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
 <Document>
+	<atom:generator url="http://code.google.com/p/googleearth-autohotkey/">GoogleEarthPhotoTag</atom:generator>
 	<name>Photos</name>
 %KMLstyle%
   )
@@ -1002,7 +1004,7 @@ KMLWrite:
   FileAppend, %KMLmain%, %KMLfile%
   If (RouteLine)
 	FileAppend, %KMLroute%, %KMLfile%
-  FileAppend, %KMLtail%, %KMLfile%
+  FileAppend, `n%KMLtail%, %KMLfile%
   KMLhead =
   KMLmain =
   KMLtail =
