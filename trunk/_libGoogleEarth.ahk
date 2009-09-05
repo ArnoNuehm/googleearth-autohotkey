@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.20
+; _libGoogleEarth.ahk  version 1.21
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.21   -   IsGEinit() function to check if Google Earth is initialized (returns 0 if logged out from server, 1 if ready & starts GE if not already running)
 ; 1.20   -   fix for exiv2.exe in path containing space (thanks Jim Smith for bug report)
 ; 1.19   -   new functions : GetJPEGComment, SetJPEGComment, WriteFileDescription, SetXmpTag, GetXmpTag
 ; 1.18   -   fix IsGErunning() for Google Earth Pro / add GEtimePlay() & GEtimePause() functions to control time-slider (GE builtin time-control is hidden when recording movies)
@@ -281,6 +282,12 @@ IsGErunning() {
 	return 0
 }
 
+; check if Google Earth is initialized (returns 0 if logged out from server, 1 if ready - starts GE if not running)
+IsGEinit() {
+	WS_Eval(theValue, "testGe()")
+	return theValue
+}
+
 ;call with GetGEpos(FocusPointLatitude,FocusPointLongitude,FocusPointAltitude,FocusPointAltitudeMode,Range,Tilt,Azimuth)
 GetGEpos(byref FocusPointLatitude, byref FocusPointLongitude, byref FocusPointAltitude, byref FocusPointAltitudeMode, byref Range, byref Tilt, byref Azimuth) {
 	If not IsGErunning()
@@ -327,7 +334,7 @@ GetGEpoint(byref PointLatitude, byref PointLongitude, byref PointAltitude) {
 }
 
 ;call with SetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth, Speed)
-SetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode = 2, Range = 50000, Tilt = 0, Azimuth = 0, Speed = 1) {
+SetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude = 0, FocusPointAltitudeMode = 2, Range = 50000, Tilt = 0, Azimuth = 0, Speed = 1) {
 	wsfunction = geSetPos(%FocusPointLatitude%, %FocusPointLongitude%, %FocusPointAltitude%, %FocusPointAltitudeMode%, %Range%, %Tilt%, %Azimuth%, %Speed%)
 	WS_Eval(returnval, wsfunction)
 	return returnval
