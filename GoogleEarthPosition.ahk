@@ -3,19 +3,20 @@
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
 ; License:  GPLv2+
-; 
+;
 ; Script for AutoHotkey   ( http://www.autohotkey.com/ )
 ; Creates a small GUI for reading the current coordinates from the Google Earth client
 ; * can also edit coordinates to make Google Earth fly to a new location
 ; * can copy coordinates to the clipboard, either in KML format or tab separated
 ;   (tab separated = for use with Google's SpreadSheet Mapper: http://earth.google.com/outreach/tutorial_mapper.html )
-; 
+;
 ; Needs _libGoogleEarth.ahk library:  http://david.tryse.net/googleearth/
 ; Needs ws4ahk.ahk library:  http://www.autohotkey.net/~easycom/
-; 
+;
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
-; 
+;
 ; Version history:
+; 1.12   -   Feet/Meters option for Altitude/Range (default picked from GE), "/start" parameter to start the Google Earth application (thanks Alan Stewart for both), more tooltips
 ; 1.11   -   remember always-on-top
 ; 1.10   -   remember window position
 ; 1.09   -   use new _libGoogleEarth.ahk library 1.18 (fix for Google Earth Pro)
@@ -31,7 +32,14 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.11
+version = 1.12
+
+IfEqual, 1, /start
+{
+	If not IsGErunning() {
+		IsGEinit() ; start Google Earth application by calling any COM API function
+	}
+}
 
 RegRead OnTop, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition, OnTop
 IfEqual, OnTop,
@@ -41,9 +49,12 @@ RoundVal := 1
 ReadAlt := 0
 
 ; -------- create right-click menu -------------
+Menu, unit, add, Feet, UnitFeet
+Menu, unit, add, Meters, UnitMeter
 Menu, context, add, Always On Top, OnTop
 Menu, context, add, Round values, RoundVal
 Menu, context, add, Read Altitude, ReadAlt
+Menu, context, add, Alt/Range Unit, :unit
 Menu, context, add,
 Menu, context, add, Show Crosshair, Crosshair
 Menu, context, add,
@@ -54,6 +65,12 @@ If RoundVal
 	Menu, context, Check, Round values
 If ReadAlt
 	Menu, context, Check, Read Altitude
+
+RegRead UnitIsFeet, HKEY_CURRENT_USER, Software\Google\Google Earth Plus\Render, FeetMiles
+IfEqual, UnitIsFeet, true
+	Gosub UnitFeet
+Else
+	Gosub UnitMeter
 
 ; ----------- create GUI ----------------
 Gui, Add, Text, x10, FocusPointLatitude:
@@ -101,10 +118,17 @@ Copy_LatLong_TT := "Copy Latitude and Longitude to the clipboard (separated by a
 Copy_LatLong_KML_TT := "Copy Latitude and Longitude to the clipboard in KML format "
 Copy_LookAt_TT := "Copy LookAt parameters (current viewpoint) to the clipboard (tab separated)`n(hold down Shift to copy comma separated)"
 Copy_LookAt_KML_TT := "Copy LookAt parameters (current viewpoint) to the clipboard in KML format"
-
-;Gui, Add, Text, x10, DMS Coordinates:
-;Gui, Add, Edit, x10 w100 ReadOnly, %A_Space%DMS Coordinates:
-;Gui, Add, Edit, yp x110 w180 vDMSCoord ReadOnly,
+;Altitude_TT := "The terrain altitude of the current focus point, in meters/feet (change unit in right-click menu).`nEnabling the option to Read Altitude (in the right-click menu) may slow down Google Earth."
+Azimuth_TT := "Rotation of the current view, in degrees (between -180 and 180)"
+Tilt_TT := "Tilt of the current view, in degrees (between 0 and 90)"
+;Range_TT := "Viewpoint distance from focus point, in meters/feet (change unit in right-click menu)"
+FocusPointAltitudeMode_TT := "Reference origin for the focus point altitude."
+;FocusPointAltitude_TT := "Altitude of the focus point, in meters/feet (always 0 when querying current position from Google Earth)"
+FocusPointLatitude_TT := "Coordinated of the current focus point (screen center)"
+FocusPointLongitude_TT := "Coordinated of the current focus point (screen center)"
+GetPos_TT := "Read current coordinates and viewpoint information from Google Earth (check Auto to update constantly)"
+FlyTo_TT := "Fly Google Earth to the coordinates and viewpoint entered above"
+Speed_TT := "How fast Google Earth should fly to a new position"
 
 Gui Add, StatusBar, vStatusBar
 SB_SetText("  Google Earth is not running ")
@@ -118,10 +142,12 @@ OnMessage(0x200, "WM_MOUSEMOVE")
 
 Loop {
   Gui, Submit, NoHide
+  FocusPointAltitudeM := FocusPointAltitude / UnitFactor
+  RangeM := Range / UnitFactor
   If (AutoLoad = "1")
 	Gosub GetPos
   If (AutoLoad != PrevAutoLoad)  {
-	  If (AutoLoad = "1") 
+	  If (AutoLoad = "1")
 	  {
 		  GuiControl, +ReadOnly, FocusPointLatitude,
 		  GuiControl, +ReadOnly, FocusPointLongitude,
@@ -157,7 +183,10 @@ Loop {
 
 GetPos:
   If not IsGErunning()
+  {
+	SB_SetText("  Google Earth is not running ")
 	return
+  }
   oldFocusPointLatitude := FocusPointLatitude
   oldFocusPointLongitude := FocusPointLongitude
   oldFocusPointAltitude := FocusPointAltitude
@@ -167,9 +196,13 @@ GetPos:
   oldAzimuth := Azimuth
   oldPointAltitude := PointAltitude
   oldDMSCoord := DMSCoord
-  GetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitude, FocusPointAltitudeMode, Range, Tilt, Azimuth)
-  If (ReadAlt)
-	GetGEpoint(PointLatitude, PointLongitude, PointAltitude)
+  GetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitudeM, FocusPointAltitudeMode, RangeM, Tilt, Azimuth)
+  FocusPointAltitude := FocusPointAltitudeM * UnitFactor
+  Range := RangeM * UnitFactor
+  If (ReadAlt) {
+	GetGEpoint(PointLatitude, PointLongitude, PointAltitudeM)
+	PointAltitude := PointAltitudeM * UnitFactor
+  }
   else
 	PointAltitude :=
   If (RoundVal) {
@@ -205,7 +238,7 @@ GetPos:
 return
 
 FlyTo:
-  SetGEpos(FocusPointLatitude,FocusPointLongitude,FocusPointAltitude,FocusPointAltitudeMode,Range,Tilt,Azimuth,Speed)
+  SetGEpos(FocusPointLatitude,FocusPointLongitude,FocusPointAltitudeM,FocusPointAltitudeMode,RangeM,Tilt,Azimuth,Speed)
 return
 
 Copy_LatLong:
@@ -219,9 +252,9 @@ return
 Copy_LookAt:
   GetKeyState, shiftstate, Shift
   If (shiftstate = "D")
-	clipboard = %FocusPointLatitude%, %FocusPointLongitude%, %FocusPointAltitude%, %Range%, %Tilt%, %Azimuth%
+	clipboard = %FocusPointLatitude%, %FocusPointLongitude%, %FocusPointAltitudeM%, %RangeM%, %Tilt%, %Azimuth%
   Else
-	clipboard = %FocusPointLatitude%`t%FocusPointLongitude%`t%FocusPointAltitude%`t%Range%`t%Tilt%`t%Azimuth%
+	clipboard = %FocusPointLatitude%`t%FocusPointLongitude%`t%FocusPointAltitudeM%`t%RangeM%`t%Tilt%`t%Azimuth%
 return
 
 Copy_LatLong_KML:
@@ -229,7 +262,7 @@ Copy_LatLong_KML:
 return
 
 Copy_LookAt_KML:
-  clipboard = <LookAt>`n`t<longitude>%FocusPointLongitude%</longitude>`n`t<latitude>%FocusPointLatitude%</latitude>`n`t<altitude>%FocusPointAltitude%</altitude>`n`t<range>%Range%</range>`n`t<tilt>%Tilt%</tilt>`n`t<heading>%Azimuth%</heading>`n</LookAt>
+  clipboard = <LookAt>`n`t<longitude>%FocusPointLongitude%</longitude>`n`t<latitude>%FocusPointLatitude%</latitude>`n`t<altitude>%FocusPointAltitudeM%</altitude>`n`t<range>%RangeM%</range>`n`t<tilt>%Tilt%</tilt>`n`t<heading>%Azimuth%</heading>`n</LookAt>
 return
 
 SavePos:
@@ -238,26 +271,31 @@ SavePos:
   If (shiftstate = "D" and altstate = "U") {
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLatitude, %FocusPointLatitude%
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLongitude, %FocusPointLongitude%
-	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitude, %FocusPointAltitude%
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitude, %FocusPointAltitudeM%
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitudeMode, %FocusPointAltitudeMode%
-	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Range, %Range%
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Range, %RangeM%
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Tilt, %Tilt%
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Azimuth, %Azimuth%
 	SB_SetText("  Saved coordinates. ")
   } else if (shiftstate = "U") {
 	RegRead, FocusPointLatitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLatitude
-	If !(FocusPointLatitude) {
+	IfEqual,FocusPointLatitude
+	{
 		SB_SetText(" No previously saved coordinates. Use Shift and click to save. ")
 		return
 	}	
 	RegRead, FocusPointLongitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLongitude
-	RegRead, FocusPointAltitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitude
+	RegRead, FocusPointAltitudeM, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitude
 	RegRead, FocusPointAltitudeMode, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitudeMode
-	RegRead, Range, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Range
+	RegRead, RangeM, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Range
 	RegRead, Tilt, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Tilt
 	RegRead, Azimuth, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Azimuth
-	If (altstate = "U")
+	FocusPointAltitude := FocusPointAltitudeM * UnitFactor
+	Range := RangeM * UnitFactor
+	If (altstate = "U") {
+		SB_SetText("  Coordinates loaded.")
 		Gosub, FlyTo
+	}
 	If (altstate = "D") {
 		GuiControl,, AutoLoad, 0
 		GuiControl,, FocusPointLatitude, %FocusPointLatitude%
@@ -349,6 +387,24 @@ ReadAlt:
 	GuiControl, -Disabled, Altitude,
   Else
 	GuiControl, +Disabled, Altitude,
+return
+
+UnitFeet:
+Menu, unit, Check, Feet
+Menu, unit, Uncheck, Meters
+UnitFactor := 3.2808399
+FocusPointAltitude_TT := "Altitude of the focus point, in feet (always 0 when querying current position from Google Earth)"
+Range_TT := "Viewpoint distance from focus point, in feet (change unit in right-click menu)"
+Altitude_TT := "The terrain altitude of the current focus point, in feet (change unit in right-click menu).`nEnabling the option to Read Altitude (in the right-click menu) may slow down Google Earth."
+return
+
+UnitMeter:
+Menu, unit, Uncheck, Feet
+Menu, unit, Check, Meters
+UnitFactor := 1
+FocusPointAltitude_TT := "Altitude of the focus point, in meters (always 0 when querying current position from Google Earth)"
+Range_TT := "Viewpoint distance from focus point, in meters (change unit in right-click menu)"
+Altitude_TT := "The terrain altitude of the current focus point, in meters (change unit in right-click menu).`nEnabling the option to Read Altitude (in the right-click menu) may slow down Google Earth."
 return
 
 GuiContextMenu:
