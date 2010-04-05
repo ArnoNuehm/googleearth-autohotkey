@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.13   -   Couple fixes for GE 5.1 (GetCamera returns FocusPointAltitudeMode = 5 which SetCameraParams doesn't take, crosshair path), Copy-LookAt shift to copy as php code
 ; 1.12   -   Feet/Meters option for Altitude/Range (default picked from GE), "/start" parameter to start the Google Earth application (thanks Alan Stewart for both), more tooltips
 ; 1.11   -   remember always-on-top
 ; 1.10   -   remember window position
@@ -32,7 +33,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.12
+version = 1.13
 
 IfEqual, 1, /start
 {
@@ -197,6 +198,8 @@ GetPos:
   oldPointAltitude := PointAltitude
   oldDMSCoord := DMSCoord
   GetGEpos(FocusPointLatitude, FocusPointLongitude, FocusPointAltitudeM, FocusPointAltitudeMode, RangeM, Tilt, Azimuth)
+  If (FocusPointAltitudeMode != 2)	; ... GetCamera seems to have started returning 5 in newer builds...but SetCameraParams doesn't seem to take this value..workaround by settings everything to 1 or 2
+	FocusPointAltitudeMode := 1
   FocusPointAltitude := FocusPointAltitudeM * UnitFactor
   Range := RangeM * UnitFactor
   If (ReadAlt) {
@@ -210,6 +213,7 @@ GetPos:
 	FocusPointLongitude := Round(FocusPointLongitude,6)
 	;FocusPointAltitude := Round(FocusPointAltitude,2)
 	Range := Round(Range,2)
+	RangeM := Round(RangeM,2)
 	Tilt := Round(Tilt,2)
 	Azimuth := Round(Azimuth,2)
 	PointAltitude := Round(PointAltitude,2)
@@ -258,11 +262,15 @@ Copy_LookAt:
 return
 
 Copy_LatLong_KML:
-  clipboard = <coordinates>%FocusPointLongitude%,%FocusPointLatitude%,0</coordinates>
+	clipboard = <coordinates>%FocusPointLongitude%,%FocusPointLatitude%,0</coordinates>
 return
 
 Copy_LookAt_KML:
-  clipboard = <LookAt>`n`t<longitude>%FocusPointLongitude%</longitude>`n`t<latitude>%FocusPointLatitude%</latitude>`n`t<altitude>%FocusPointAltitudeM%</altitude>`n`t<range>%RangeM%</range>`n`t<tilt>%Tilt%</tilt>`n`t<heading>%Azimuth%</heading>`n</LookAt>
+  GetKeyState, shiftstate, Shift
+  If (shiftstate = "D")
+	clipboard = $kml .= flyTo(%FocusPointLatitude%, %FocusPointLongitude%, %RangeM%, %Tilt%, %Azimuth%, "bounce", 2);`n
+  Else
+	clipboard = <LookAt>`n`t<longitude>%FocusPointLongitude%</longitude>`n`t<latitude>%FocusPointLatitude%</latitude>`n`t<altitude>%FocusPointAltitudeM%</altitude>`n`t<range>%RangeM%</range>`n`t<tilt>%Tilt%</tilt>`n`t<heading>%Azimuth%</heading>`n</LookAt>
 return
 
 SavePos:
@@ -283,10 +291,12 @@ SavePos:
 	{
 		SB_SetText(" No previously saved coordinates. Use Shift and click to save. ")
 		return
-	}	
+	}
 	RegRead, FocusPointLongitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLongitude
 	RegRead, FocusPointAltitudeM, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitude
 	RegRead, FocusPointAltitudeMode, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitudeMode
+	If (FocusPointAltitudeMode > 2)	
+		FocusPointAltitudeMode := 1		; SetCameraParams won't take higher values
 	RegRead, RangeM, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Range
 	RegRead, Tilt, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Tilt
 	RegRead, Azimuth, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Azimuth
@@ -349,10 +359,13 @@ return
 
 Crosshair:
   RegRead GoogleEarthPath, HKEY_LOCAL_MACHINE, SOFTWARE\Google\Google Earth Plus, InstallDir
+  RegRead GoogleEarthPath5, HKEY_CURRENT_USER, SOFTWARE\Google\Google Earth Plus, InstallLocation
   IfExist, %GoogleEarthPath%\res\cursor_crosshair_thick.png
 	CrosshairImage = %GoogleEarthPath%\res\cursor_crosshair_thick.png
   Else IfExist, %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
 	CrosshairImage = %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
+  Else IfExist, %GoogleEarthPath5%\client\res\cursor_crosshair_thick.png
+	CrosshairImage = %GoogleEarthPath5%\client\res\cursor_crosshair_thick.png
   Else
 	CrosshairImage = %A_ProgramFiles%\Google\Google Earth\res\shapes\cross-hairs_highlight.png
   CrosshairKml =
