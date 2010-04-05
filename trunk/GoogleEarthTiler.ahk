@@ -10,12 +10,14 @@
 ; Needs _libGoogleEarth.ahk library:  http://david.tryse.net/googleearth/
 ; Needs convert.exe and idenfity.exe from ImageMagick:  http://www.imagemagick.org/
 ; 
+; Version history:
+; 1.01   -   fix ImageMagick download path
 
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.00
+version = 1.01
 
 ; ------------ find ImageMagick tools identify.exe / convert.exe -----------
 RegRead, ImageMagickPath, HKEY_LOCAL_MACHINE, SOFTWARE\ImageMagick\Current, BinPath
@@ -484,7 +486,7 @@ Weblink2:
 Return
 
 Weblink3:
-  Run, http://www.imagemagick.org/binary-releases.html#windows,,UseErrorLevel
+  Run, http://www.imagemagick.org/script/binary-releases.php#windows,,UseErrorLevel
 Return
 
 Emaillink:
