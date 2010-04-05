@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.22   -   register .jpg under HKCU instead of HKLM
 ; 1.21   -   use new _libGoogleEarth.ahk library 1.20 (fix for exiv2.exe in path containing space), fix balloon-style for GE5
 ; 1.20   -   option to keep current Google Earth viewpoint altitude when flying to new location
 ; 1.19   -   option to disable autosizing of columns, swap description and folder columns, remember always-on-top and autosize-col options, better keyboard shortcuts
@@ -40,7 +41,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarth.ahk
-version = 1.21
+version = 1.22
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -868,16 +869,16 @@ return
 
 Assoc:
   Gui +OwnDialogs
-  RegRead JpegReg, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\.jpg
-  RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSRead\command , , "%A_ScriptFullPath%" "`%1"
-  RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSRead , , Read Google Earth coordinates from file
-  RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite\command , , "%A_ScriptFullPath%" /SavePos "`%1"
-  RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite , , Write Google Earth coordinates to file
-  RegRead JpegReg, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\.jpeg
-  RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSRead\command , , "%A_ScriptFullPath%" "`%1"
-  RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSRead , , Read Google Earth coordinates from file
-  RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite\command , , "%A_ScriptFullPath%" /SavePos "`%1"
-  RegWrite REG_SZ, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite , , Write Google Earth coordinates to file
+  RegRead JpegReg, HKEY_CURRENT_USER, SOFTWARE\Classes\.jpg
+  RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSRead\command , , "%A_ScriptFullPath%" "`%1"
+  RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSRead , , Read Google Earth coordinates from file
+  RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite\command , , "%A_ScriptFullPath%" /SavePos "`%1"
+  RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite , , Write Google Earth coordinates to file
+  RegRead JpegReg, HKEY_CURRENT_USER, SOFTWARE\Classes\.jpeg
+  RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSRead\command , , "%A_ScriptFullPath%" "`%1"
+  RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSRead , , Read Google Earth coordinates from file
+  RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite\command , , "%A_ScriptFullPath%" /SavePos "`%1"
+  RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite , , Write Google Earth coordinates to file
   MsgBox,, Registry Options, You can now right-click JPEG files to read/save GPS coordinates
 return
 
