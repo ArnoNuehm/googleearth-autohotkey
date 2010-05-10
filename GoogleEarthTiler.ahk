@@ -11,13 +11,14 @@
 ; Needs convert.exe and idenfity.exe from ImageMagick:  http://www.imagemagick.org/
 ; 
 ; Version history:
+; 1.02   -   add network-link kml hierarchy output, fix progress bar
 ; 1.01   -   fix ImageMagick download path
 
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.01
+version = 1.02
 
 ; ------------ find ImageMagick tools identify.exe / convert.exe -----------
 RegRead, ImageMagickPath, HKEY_LOCAL_MACHINE, SOFTWARE\ImageMagick\Current, BinPath
@@ -93,24 +94,27 @@ LatitudeEast_TT := "A number between -180 and 180.`nCoordinate for the right (or
 
 Gui, Add, Text, yp+40 xm, Tile Size:
 Gui, Add, DropDownList, yp-4 xp+50 w80 Choose2 gPreCheck vTilesize, 128x128|256x256|512x512
-Gui, Add, Text, yp+4 xp+90, Tile Grid:
-Gui, Add, DropDownList, yp-4 xp+50 w60 Choose1 gPreCheck vGrid, 2x2|3x3|4x4
+Gui, Add, Text, yp+4 xp+92, KML:
+Gui, Add, DropDownList, yp-4 xp+33 w90 Choose1 gPreCheck vKmltype, Single-file|Network-links
 Tilesize_TT := "Size in pixels of the output image tiles.`nA bigger size (like 512x512) means fewer output files."
-Grid_TT := "Tile arrangement: how many smaller images to show inside each image when zooming closer."
+Kmltype_TT := "Output KML as a single file or as a hierarchy of small network link files?`nNetwork links are better for larger projects."
+;Gui, Add, Text, yp+4 xp+90, Tile Grid:
+;Gui, Add, DropDownList, yp-4 xp+50 w60 Choose1 gPreCheck vGrid, 2x2|3x3|4x4
+;Grid_TT := "Tile arrangement: how many smaller images to show inside each image when zooming closer."
 
 Gui, Add, Button, yp-1 xm+271 w50 h47 vAbout gAbout, &?
 
 Gui, Add, Text, yp+29 xm+0, Fade-in:
 Gui, Add, DropDownList, yp-4 xp+50 w80 Choose1 vFadeIn, Smooth|Instant
-Gui, Add, Text, yp+4 xp+91, ...and...
-Gui, Add, DropDownList, yp-4 xp+49 w60 Choose1 vFadeDist, Near|Far
+Gui, Add, Text, yp+4 xp+84, ...and...
+Gui, Add, DropDownList, yp-4 xp+41 w90 Choose1 vFadeDist, Near|Far
 FadeIn_TT := """Smooth"" uses transparency to fade in new images when zooming closer.`n""Instant"" shows new images directly, for higher performance.`n (this option corresponds to the <minFadeExtent> setting in the KML output)"
 FadeDist_TT := "How soon to show more detailed image tiles when zooming closer.`n""Near"" has higher performance, ""Far"" looks better.`n (this option corresponds to the <minLodPixels> setting in the KML output)"
 
 Gui Add, Text, xm yp+34, Output &Folder:
 Gui Add, Edit, vOutFolder yp-4 xp+85 w200 r1 0x400,
 Gui Add, Button, yp-1 xp+205 w31 h23 gFolderBrowse, &...
-OutFolder_TT := "Destination folder for the image tile files and output.kml file.`nIt is best to use an empty folder."
+OutFolder_TT := "Destination folder for the image tile files and the output.kml file.`nIt is best to use an empty folder."
 
 Gui, Add, Text, yp+29 xm+0, Output Format:
 Gui, Add, DropDownList, yp-4 xp+85 w50 Choose2 vFormat, PNG|JPG
@@ -119,14 +123,14 @@ Gui, Add, DropDownList, yp-4 xp+40 w50 Choose3 vQuality, 90|80|70|60|50|40|30|20
 Gui, Font, bold
 Gui, Add, Button, yp-1 xp+66 w70 vGoButton gMake, &Go!
 Gui, Font, norm
-Format_TT := """JPG"" output has the smallest size and highest performance.`n""PNG"" output is useful for preserving transparency in the input image file."
-Quality_TT := "JPG output quality or PNG compression."
+Format_TT := "JPG image output has the smallest size and highest performance.`nPNG output is useful for preserving transparency in the input image file."
+Quality_TT := "JPG output quality or PNG compression level."
 
 Gui, Add, Progress, xm w321 h14 vProgressBar
 Gui Add, StatusBar, vStatusBar
 
-;Gui, Add, Button, ym xm greload hidden, reloa&d
-;Gui, Add, Button, ym xm gdebug hidden, d&ebug
+; Gui, Add, Button, ym xm greload hidden, reloa&d
+; Gui, Add, Button, ym xm gdebug hidden, d&ebug
 Gui, Show,, Google Earth Tiler %version%
 Gui +LastFound
 OnMessage(0x200, "WM_MOUSEMOVE")
@@ -195,6 +199,8 @@ PreCheck:
   bigside := (imgx > imgy) ? "x" : "y"
   StringSplit, Tilesize, Tilesize, x
   tilesize := Tilesize1
+  IfEqual, Grid
+	Grid := "2x2"
   StringSplit, Grid, Grid, x
   minfade := (FadeIn == "Smooth") ? 128 : 0
   minlod := (FadeDist == "Near") ? tilesize : Round(tilesize * 0.7)
@@ -231,6 +237,9 @@ PreCheck:
 		CMDlineResize := ""
 	}
 	files := (fulltilesx + parttilesx) * (fulltilesy + parttilesy)
+	level%gridlevel%files := files
+	level%gridlevel%x := (fulltilesx + parttilesx)
+	level%gridlevel%y := (fulltilesy + parttilesy)
 	totfiles := files + totfiles
 	GridListDebugInfo =  %GridListDebugInfo% `n %gridlevel%	%sizex%x%sizey%	%files%	%tilesize%x%tilesize%	%fulltilesx%x%fulltilesy%	%ptsizex%x%ptsizey%	%parttilesx%x%parttilesy%
 	If (makeimg) {
@@ -245,7 +254,8 @@ PreCheck:
 			yplace := SubStr("000" (mod((A_index-1), (fulltilesx + parttilesx))),-3)	; location on grid Y
 			newname := "tile_" gridlevel "_" xplace "_" yplace "." Format
 			noextname := "tile_" gridlevel "_" xplace "_" yplace
-			FileMove, %oldname%, %OutFolder%\%newname%, 1
+			If (makeimg)
+				FileMove, %oldname%, %OutFolder%\%newname%, 1
 			tilewidth := (parttilesx and yplace == (fulltilesx + parttilesx - 1)) ? ptsizex : tilesize		; width is partial width if last column
 			tileheight := (parttilesy and xplace == (fulltilesy + parttilesy - 1)) ? ptsizey : tilesize		; height is partial height if last row
 			If (gridlevel == 0) {
@@ -259,7 +269,26 @@ PreCheck:
 				TileLongWest := LatitudeWest + LatitudeFull * (yplace * tilesize) / sizex
 				TileLongEast := LatitudeWest + LatitudeFull * (yplace * tilesize + tilewidth) / sizex
 			}
-			KMLOutput := KMLOutput "`r`n`t" OverlayKML(noextname, newname, TileLatNorth, TileLatSouth, TileLongEast, TileLongWest, gridlevel, minlod, minfade)
+			thisKML := OverlayKML(noextname, newname, TileLatNorth, TileLatSouth, TileLongEast, TileLongWest, gridlevel, minlod, minfade)
+			KMLOutput := KMLOutput "`r`n`t" thisKML
+			if (Kmltype == "Network-links") {
+				if (!finalround) {
+					NWKMLfile := OutFolder "\nw" noextname ".kml"
+					FileDelete, %NWKMLfile%
+					FileAppend, %KMLhead%`r`n`t%thisKML%, %NWKMLfile%
+					if (gridlevel) {
+						NWKMLparent := OutFolder "\nwtile_" gridlevel-1 "_" SubStr("000" Floor(xplace/2),-3) "_" SubStr("000" Floor(yplace/2),-3) ".kml"	; find the parent in the network-link hierarchy
+						thisNW := NWlink(noextname, TileLatNorth, TileLatSouth, TileLongEast, TileLongWest, "nw" noextname ".kml", minlod)
+						FileAppend, %thisNW%, %NWKMLparent%
+					}
+				} else {
+					if (gridlevel) {
+						lastlevel := gridlevel-1
+						NWKMLparent := OutFolder "\nwtile_" gridlevel-1 "_" SubStr("000" Floor( xplace*tilesize / sizex * (level%lastlevel%x)),-3) "_" SubStr("000" Floor( yplace*tilesize / sizey * (level%lastlevel%y)),-3) ".kml"		; final level might not fit grid perfectly - just drop under closest parent
+						FileAppend, `r`n`t%thisKML%, %NWKMLparent%
+					}
+				}
+			}
 		}
 		KMLOutput := KMLOutput "`r`n</Folder>"
 		GuiControl,,ProgressBar, % ((gridlevel + 1) / (GridLevels) * 100)//1
@@ -269,17 +298,24 @@ PreCheck:
 		Break
   }
   GridListDebugInfo =  %GridListDebugInfo% `n`nTotal image tiles: %totfiles%
+  gridlevels := gridlevel
   ; KMLsize := Round((StrLen(KMLOutput) + StrLen(KMLhead) + StrLen(KMLtail)) / 1024)
   If (totfiles > 1)
 	SB_SetText("  Output: " totfiles " image tile files in " gridlevel " zoom levels.")
   If (makekml) {
-	KMLfile := OutFolder "\output.kml"
-	IfExist, %KMLfile%
-		FileMove, %KMLfile%, %OutFolder%\output-old.kml, 1
-	FileDelete, %KMLfile%
-	FileAppend, %KMLhead%, %KMLfile%
-	FileAppend, %KMLOutput%, %KMLfile%
-	FileAppend, %KMLtail%, %KMLfile%
+    if (Kmltype == "Network-links") {
+		Loop, %OutFolder%\nwtile_?_????_????.kml
+		{
+			FileAppend, %KMLtail%, %A_LoopFileFullPath%
+		}
+		FileMove %OutFolder%\nwtile_0_0000_0000.kml, %OutFolder%\output_nw.kml,1
+	} else {
+		KMLfile := OutFolder "\output.kml"
+		IfExist, %KMLfile%
+			FileMove, %KMLfile%, %OutFolder%\output-old.kml, 1
+		FileDelete, %KMLfile%
+		FileAppend, %KMLhead%%KMLOutput%%KMLtail%, %KMLfile%
+	}
 	KMLOutput :=
 	makekml :=
 	GuiControl, Enable, GoButton
@@ -310,23 +346,49 @@ OverlayKML(name, filename, north, south, east, west, draworder = "1", minlod = "
   If (draworder) {	; don't add Region for first level
 	KMLOutput = %KMLOutput%`n
 	(
-		<Region> 
-			<LatLonAltBox> 
+		<Region>
+			<LatLonAltBox>
 				<north>%north%</north>
 				<south>%south%</south>
 				<east>%east%</east>
 				<west>%west%</west>
-			</LatLonAltBox> 
-			<Lod> 
-				<minLodPixels>%minlod%</minLodPixels> 
-				<maxLodPixels>-1</maxLodPixels> 
-				<minFadeExtent>%minfade%</minFadeExtent> 
-				<maxFadeExtent>0</maxFadeExtent> 
-			</Lod> 
+			</LatLonAltBox>
+			<Lod>
+				<minLodPixels>%minlod%</minLodPixels>
+				<maxLodPixels>-1</maxLodPixels>
+				<minFadeExtent>%minfade%</minFadeExtent>
+				<maxFadeExtent>0</maxFadeExtent>
+			</Lod>
 		</Region>
 	)
   }
   KMLOutput := KMLOutput "`n`t</GroundOverlay>"
+  return KMLOutput
+}
+
+NWlink(nwname, north, south, east, west, link, minlod="128") {
+  KMLOutput = %KMLOutput%`n
+  (
+	<NetworkLink>
+		<name>%nwname%</name>
+		<Region>
+			<LatLonAltBox>
+				<north>%north%</north>
+				<south>%south%</south>
+				<east>%east%</east>
+				<west>%west%</west>
+			</LatLonAltBox>
+			<Lod>
+				<minLodPixels>%minlod%</minLodPixels>
+				<maxLodPixels>-1</maxLodPixels>
+			</Lod>
+		</Region>
+		<Link>
+			<href>%link%</href>
+			<viewRefreshMode>onRegion</viewRefreshMode>
+		</Link>
+	</NetworkLink>
+  )
   return KMLOutput 
 }
 
@@ -384,7 +446,7 @@ WM_MOUSEMOVE() {
     SetTimer, DisplayToolTip, Off
     If !(RegExReplace(CurrControl,"[a-zA-Z0-9_]"))	; check to only do next line if CurrControl is a well formed variable name, to avoid errors.
 	ToolTip % %CurrControl%_TT  ; The leading percent sign tell it to use an expression.
-    SetTimer, RemoveToolTip, 5000
+    SetTimer, RemoveToolTip, 8000
     return
 
     RemoveToolTip:
@@ -446,12 +508,14 @@ About:
   Gui 2:Add,Text,xm yp+22, Options:
   Gui 2:Font,Norm Bold
   Gui 2:Add,Text,xm+5 yp+16, Tile Size:
-  Gui 2:Add,Text,xm+5 yp+16, Tile Grid:
+;  Gui 2:Add,Text,xm+5 yp+16, Tile Grid:
+  Gui 2:Add,Text,xm+5 yp+16, KML:
   Gui 2:Add,Text,xm+5 yp+16, Fade-in:
   Gui 2:Add,Text,xm+5 yp+64, Output Format:
   Gui 2:Font
   Gui 2:Add,Text,xp+55 yp-96, The size in pixels of each image output tile (bigger means fewer files).
-  Gui 2:Add,Text,xp yp+16, How many new images should be inside each image when zooming closer.
+;  Gui 2:Add,Text,xp yp+16, How many new images should be inside each image when zooming closer.
+  Gui 2:Add,Text,xp-24 yp+16, Output KML as a single large file or as a hierarchy of small network-link files?
   Gui 2:Add,Text,xm+10 yp+32, Smooth/Instant - smooth uses transparency to fade in new images when zooming closer.
   Gui 2:Add,Text,xm+10 yp+16, Near/Far - How close you need to zoom in to see more detailed images.
   Gui 2:Add,Text,xm+10 yp+16, (Instant+Near has the best performance, while Smooth+Far looks better.)
