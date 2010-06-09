@@ -11,6 +11,7 @@
 ; Needs convert.exe and idenfity.exe from ImageMagick:  http://www.imagemagick.org/
 ; 
 ; Version history:
+; 1.03   -   fix ImageMagick path issue, use cmdret.dll
 ; 1.02   -   add network-link kml hierarchy output, fix progress bar
 ; 1.01   -   fix ImageMagick download path
 
@@ -18,12 +19,14 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.02
+version = 1.03
+FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1	; bundle cmdret.dll in executable (avoids temp files when capturing cmdline output)
 
 ; ------------ find ImageMagick tools identify.exe / convert.exe -----------
 RegRead, ImageMagickPath, HKEY_LOCAL_MACHINE, SOFTWARE\ImageMagick\Current, BinPath
 IfNotExist, ImageMagickPath "\identify.exe"
 {
+  ImageMagickPath :=
   EnvGet, EnvPath, Path
   EnvPath := A_ScriptDir ";" "c:\Program Files\ImageMagick" ";" EnvPath
   Loop, Parse, EnvPath, `;
@@ -44,7 +47,7 @@ IfNotExist, ImageMagickPath "\identify.exe"
 		Msgbox,48, Cannot find ImageMagick identify.exe, Error: This tool needs the ImageMagick tools (identify.exe/convert.exe)`nThe tools can be downloaded for free from www.ImageMagick.org
 		ExitApp
 	} else {
-		RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPhotoTag, ImageMagickPath, %ImageMagickPath%
+		RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, ImageMagickPath, %ImageMagickPath%
 	}
   }
 }
@@ -402,7 +405,7 @@ OpenFile:
   SB_SetText("")
   Sleep 10
   ImageXYret := ImageDim(SelectedFile, ImageWidth, ImageHeight, ImageMagickPath "\identify.exe", skipifnoIM = "1")
-  If (ImageXYret) {
+  If (ImageXYret or ImageWidth = "" or ImageHeight = "") {
 	Msgbox, 48, Error reading image file, Error getting dimensions for file: %SelectedFile%
   } else {
 	GuiControl,, ImageFile, %SelectedFile%
@@ -488,7 +491,6 @@ GuiContextMenu:
 return
 
 GuiClose:
-  WS_Uninitialize()
 ExitApp
 
 About:
