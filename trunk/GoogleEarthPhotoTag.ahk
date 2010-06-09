@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.23   -   fix GE 5.1 crosshair path, jpeg file association issue
 ; 1.22   -   register .jpg under HKCU instead of HKLM
 ; 1.21   -   use new _libGoogleEarth.ahk library 1.20 (fix for exiv2.exe in path containing space), fix balloon-style for GE5
 ; 1.20   -   option to keep current Google Earth viewpoint altitude when flying to new location
@@ -40,8 +41,8 @@
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
-#Include _libGoogleEarth.ahk
-version = 1.22
+#Include _libGoogleEarthCOM.ahk
+version = 1.23
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -870,6 +871,10 @@ return
 Assoc:
   Gui +OwnDialogs
   RegRead JpegReg, HKEY_CURRENT_USER, SOFTWARE\Classes\.jpg
+  IfEqual JpegReg,
+	RegRead JpegReg, HKEY_LOCAL_MACHINE, SOFTWARE\Classes\.jpg
+  IfEqual JpegReg,
+	JpegReg := "jpegfile"
   RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSRead\command , , "%A_ScriptFullPath%" "`%1"
   RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSRead , , Read Google Earth coordinates from file
   RegWrite REG_SZ, HKEY_CURRENT_USER, SOFTWARE\Classes\%JpegReg%\shell\GPSWrite\command , , "%A_ScriptFullPath%" /SavePos "`%1"
@@ -886,10 +891,13 @@ return
 
 Crosshair:
   RegRead GoogleEarthPath, HKEY_LOCAL_MACHINE, SOFTWARE\Google\Google Earth Plus, InstallDir
+  RegRead GoogleEarthPath5, HKEY_CURRENT_USER, SOFTWARE\Google\Google Earth Plus, InstallLocation
   IfExist, %GoogleEarthPath%\res\cursor_crosshair_thick.png
 	CrosshairImage = %GoogleEarthPath%\res\cursor_crosshair_thick.png
   Else IfExist, %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
 	CrosshairImage = %GoogleEarthPath%\res\shapes\cross-hairs_highlight.png
+  Else IfExist, %GoogleEarthPath5%\client\res\cursor_crosshair_thick.png
+	CrosshairImage = %GoogleEarthPath5%\client\res\cursor_crosshair_thick.png
   Else
 	CrosshairImage = %A_ProgramFiles%\Google\Google Earth\res\shapes\cross-hairs_highlight.png
   CrosshairKml =
