@@ -11,6 +11,7 @@
 ; Needs convert.exe and idenfity.exe from ImageMagick:  http://www.imagemagick.org/
 ; 
 ; Version history:
+; 1.04   -   read coordinates from KML file <GroundOverlay> tag, remember screen position/foder/coords, open folder button, open in GE button, new-version-check, fix "0" as coordinate bug
 ; 1.03   -   fix ImageMagick path issue, use cmdret.dll
 ; 1.02   -   add network-link kml hierarchy output, fix progress bar
 ; 1.01   -   fix ImageMagick download path
@@ -19,13 +20,12 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.03
+version = 1.04
 FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1	; bundle cmdret.dll in executable (avoids temp files when capturing cmdline output)
 
 ; ------------ find ImageMagick tools identify.exe / convert.exe -----------
 RegRead, ImageMagickPath, HKEY_LOCAL_MACHINE, SOFTWARE\ImageMagick\Current, BinPath
-IfNotExist, ImageMagickPath "\identify.exe"
-{
+If (!FileExist(ImageMagickPath "\identify.exe")) {
   ImageMagickPath :=
   EnvGet, EnvPath, Path
   EnvPath := A_ScriptDir ";" "c:\Program Files\ImageMagick" ";" EnvPath
@@ -61,10 +61,17 @@ KMLhead =
 )
 KMLtail := "`r`n</Document>`r`n</kml>"
 
+; ----------- restore last folder/coords ----------------
+RegRead, OutFolder, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, OutFolder
+RegRead, LongitudeNorth, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, LongitudeNorth
+RegRead, LongitudeSouth, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, LongitudeSouth
+RegRead, LatitudeWest, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, LatitudeWest
+RegRead, LatitudeEast, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, LatitudeEast
 
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop
 Menu, context, add,
+Menu, context, add, Check for updates, webHome
 Menu, context, add, About, About
 
 ; ----------- create GUI ----------------
@@ -86,10 +93,13 @@ Gui, Font, norm
 Gui, Add, Text, yp+18 xm+6, &North:
 Gui, Add, Text, yp+24 xm+6, West-East:
 Gui, Add, Text, yp+24 xm+6, South:
-Gui, Add, Edit, yp-52 xm+128 w120 vLongitudeNorth,
-Gui, Add, Edit, yp+24 xm+66 w120 vLatitudeWest,
-Gui, Add, Edit, yp xp+124 w120 vLatitudeEast,
-Gui, Add, Edit, yp+24 xm+128 w120 vLongitudeSouth,
+Gui, Add, Edit, yp-52 xm+113 w120 vLongitudeNorth, %LongitudeNorth%
+Gui, Add, Button, yp xm+251 w60 h21 gOpenKmlDialog, from KML
+; Gui, Add, Edit, yp-52 xm+128 w120 vLongitudeNorth, %LongitudeNorth%
+Gui, Add, Edit, yp+24 xm+66 w120 vLatitudeWest, %LatitudeWest%
+Gui, Add, Edit, yp xp+124 w120 vLatitudeEast, %LatitudeEast%
+Gui, Add, Edit, yp+24 xm+113 w120 vLongitudeSouth, %LongitudeSouth%
+; Gui, Add, Edit, yp+24 xm+128 w120 vLongitudeSouth, %LongitudeSouth%
 LongitudeNorth_TT := "A number between -90 and 90.`nCoordinate for the top (or northern) edge of the <GroundOverlay> image."
 LongitudeSouth_TT := "A number between -90 and 90.`nCoordinate for the bottom (or southern) edge of the <GroundOverlay> image."
 LatitudeWest_TT := "A number between -180 and 180.`nCoordinate for the left (or western) edge of the <GroundOverlay> image."
@@ -115,7 +125,7 @@ FadeIn_TT := """Smooth"" uses transparency to fade in new images when zooming cl
 FadeDist_TT := "How soon to show more detailed image tiles when zooming closer.`n""Near"" has higher performance, ""Far"" looks better.`n (this option corresponds to the <minLodPixels> setting in the KML output)"
 
 Gui Add, Text, xm yp+34, Output &Folder:
-Gui Add, Edit, vOutFolder yp-4 xp+85 w200 r1 0x400,
+Gui Add, Edit, vOutFolder yp-4 xp+85 w200 r1 0x400, %OutFolder%
 Gui Add, Button, yp-1 xp+205 w31 h23 gFolderBrowse, &...
 OutFolder_TT := "Destination folder for the image tile files and the output.kml file.`nIt is best to use an empty folder."
 
@@ -129,12 +139,19 @@ Gui, Font, norm
 Format_TT := "JPG image output has the smallest size and highest performance.`nPNG output is useful for preserving transparency in the input image file."
 Quality_TT := "JPG output quality or PNG compression level."
 
+Gui, Add, Text, yp+35 xm+0, Result:
+Gui Add, Button, yp-5 xm+65 w112 h23 gFolderOpen, Open Output Folder
+Gui Add, Button, yp xp+119 w137 h23 gKMLOpen, Open in Google Earth
+; Gui Add, Button, yp+29 xm+65 w112 h23 gFolderOpen, Open Output Folder
+; Gui Add, Button, yp xp+119 w137 h23 gKMLOpen, Open in Google Earth
+
 Gui, Add, Progress, xm w321 h14 vProgressBar
 Gui Add, StatusBar, vStatusBar
 
 ; Gui, Add, Button, ym xm greload hidden, reloa&d
 ; Gui, Add, Button, ym xm gdebug hidden, d&ebug
-Gui, Show,, Google Earth Tiler %version%
+WinPos := GetSavedWinPos("GoogleEarthTiler")
+Gui, Show, %WinPos%, Google Earth Tiler %version%
 Gui +LastFound
 OnMessage(0x200, "WM_MOUSEMOVE")
 return
@@ -149,7 +166,7 @@ Make:
 	Msgbox, 48, Error, Error: Please select output directory
 	return
   }
-  If (!LongitudeNorth or !LongitudeSouth or !LatitudeEast or !LatitudeWest) {
+  If (LongitudeNorth == "" or LongitudeSouth == "" or LatitudeEast == "" or LatitudeWest == "") {
 	Msgbox, 48, Problem with coordinates, Error: Please enter coordinates
 	return
   }
@@ -282,12 +299,16 @@ PreCheck:
 					if (gridlevel) {
 						NWKMLparent := OutFolder "\nwtile_" gridlevel-1 "_" SubStr("000" Floor(xplace/2),-3) "_" SubStr("000" Floor(yplace/2),-3) ".kml"	; find the parent in the network-link hierarchy
 						thisNW := NWlink(noextname, TileLatNorth, TileLatSouth, TileLongEast, TileLongWest, "nw" noextname ".kml", minlod)
+						IfnotExist, %NWKMLparent%
+							FileAppend, %KMLhead%, %NWKMLparent%
 						FileAppend, %thisNW%, %NWKMLparent%
 					}
 				} else {
 					if (gridlevel) {
 						lastlevel := gridlevel-1
 						NWKMLparent := OutFolder "\nwtile_" gridlevel-1 "_" SubStr("000" Floor( xplace*tilesize / sizex * (level%lastlevel%x)),-3) "_" SubStr("000" Floor( yplace*tilesize / sizey * (level%lastlevel%y)),-3) ".kml"		; final level might not fit grid perfectly - just drop under closest parent
+						IfnotExist, %NWKMLparent%
+							FileAppend, %KMLhead%, %NWKMLparent%
 						FileAppend, `r`n`t%thisKML%, %NWKMLparent%
 					}
 				}
@@ -395,10 +416,21 @@ NWlink(nwname, north, south, east, west, link, minlod="128") {
   return KMLOutput 
 }
 
+OpenKmlDialog:
+  FileSelectFile, SelectedFile, 3, , Open a KML file with a <GroundOverlay> tag..., KML files (*.kml)
+  IfEqual SelectedFile,, return
+  CoordFromKML(SelectedFile)
+return
+
 OpenFileDialog:
   FileSelectFile, SelectedFile, 3, , Open an image file..., Image files (*.*)
 OpenFile:
   IfEqual SelectedFile,, return
+  SplitPath, SelectedFile,,, Ext,
+  If (Ext == "kml") {
+	CoordFromKML(SelectedFile)
+	return
+  }
   GuiControl,, ImageFile,
   GuiControl,, ImageWidth,...
   GuiControl,, ImageHeight,...
@@ -412,8 +444,30 @@ OpenFile:
 	GuiControl,, ImageWidth, %ImageWidth%
 	GuiControl,, ImageHeight, %ImageHeight%
 	GoSub PreCheck
+	SplitPath, SelectedFile,, Dir,, Name
+	If (FileExist(Dir "\" Name ".kml")) {
+		MsgBox, 4, Load coordinates from KML file?, A .kml file with the same name as the image exists in the folder.`nWould you like to try loading <GroundOverlay> coordinates from it?
+		IfMsgBox Yes
+			CoordFromKML(Dir "\" Name ".kml")
+	}
   }
 return
+
+CoordFromKML(kmlcoordfile) {
+	FileRead kmlcode, %kmlcoordfile%
+	RegExMatch(kmlcode, "s).*<GroundOverlay>.*<LatLonBox>.*<north>([0-9\.-]*)</north>.*</LatLonBox>.*</GroundOverlay>.*", kmlnorth)
+	RegExMatch(kmlcode, "s).*<GroundOverlay>.*<LatLonBox>.*<south>([0-9\.-]*)</south>.*</LatLonBox>.*</GroundOverlay>.*", kmlsouth)
+	RegExMatch(kmlcode, "s).*<GroundOverlay>.*<LatLonBox>.*<west>([0-9\.-]*)</west>.*</LatLonBox>.*</GroundOverlay>.*", kmlwest)
+	RegExMatch(kmlcode, "s).*<GroundOverlay>.*<LatLonBox>.*<east>([0-9\.-]*)</east>.*</LatLonBox>.*</GroundOverlay>.*", kmleast)
+	If (kmlnorth1 != "" and kmlsouth1 != "" and kmlwest1 != "" and kmleast1 != "") {
+		GuiControl,, LongitudeNorth, %kmlnorth1%
+		GuiControl,, LongitudeSouth, %kmlsouth1%
+		GuiControl,, LatitudeWest, %kmlwest1%
+		GuiControl,, LatitudeEast, %kmleast1%
+	} else {
+		Msgbox,48, No GroundOverlay coordinates found!, Error: Cannot find GroundOverlay LatLonBox coordinates in %kmlcoordfile%.
+	}
+}
 
 FolderBrowse:
   Gui +OwnDialogs
@@ -423,6 +477,20 @@ FolderBrowse:
 	OutFolder = %folder%
 	GuiControl ,, OutFolder, %OutFolder%
   }
+return
+
+FolderOpen:
+	Gui, Submit, NoHide
+	IfNotExist, %OutFolder%
+		FileCreateDir, %OutFolder%
+	IfExist, %OutFolder%
+		Run, %OutFolder%
+return
+
+KMLOpen:
+	Gui, Submit, NoHide
+	IfExist, %OutFolder%\output.kml
+		Run, %OutFolder%\output.kml
 return
 
 GuiDropFiles:
@@ -491,6 +559,13 @@ GuiContextMenu:
 return
 
 GuiClose:
+  SaveWinPos("GoogleEarthTiler")
+  Gui, Submit, NoHide
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, OutFolder, %OutFolder%
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, LongitudeNorth, %LongitudeNorth%
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, LongitudeSouth, %LongitudeSouth%
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, LatitudeWest, %LatitudeWest%
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthTiler, LatitudeEast, %LatitudeEast%
 ExitApp
 
 About:
@@ -500,6 +575,7 @@ About:
   Gui 2:Font,Bold
   Gui 2:Add,Text,x+0 yp+10, Google Earth Tiler %version%
   Gui 2:Font
+  Gui 2:Add,Text,xm yp+16, by David Tryse
   Gui 2:Add,Text,xm yp+22, A small program for creating high-resolution image overlays for Google Earth.
   Gui 2:Add,Text,xm yp+22, Input is a large image file and coordinates for where it should be located on the ground.
   Gui 2:Add,Text,xm yp+16, Output is a hierarchy of small image tiles of increasing resolution, and a KML file to load
@@ -526,12 +602,12 @@ About:
   Gui 2:Add,Text,xm yp+22, License: GPLv2+
   Gui 2:Add,Text,xm yp+26, This program requires ImageMagick convert.exe/identify.exe:
   Gui 2:Font,CBlue Underline
-  Gui 2:Add,Text,xm gWeblink3 yp+15, http://www.imagemagick.org
+  Gui 2:Add,Text,xm gwebIM yp+15, http://www.imagemagick.org
   Gui 2:Font
   Gui 2:Add,Text,xm yp+22, Check for updates here:
   Gui 2:Font,CBlue Underline
-  Gui 2:Add,Text,xm gWeblink yp+15, http://david.tryse.net/googleearth/
-  Gui 2:Add,Text,xm gWeblink2 yp+15, http://googleearth-autohotkey.googlecode.com
+  Gui 2:Add,Text,xm gwebHome yp+15, http://earth.tryse.net
+  Gui 2:Add,Text,xm gwebCode yp+15, http://googleearth-autohotkey.googlecode.com
   Gui 2:Font
   Gui 2:Add,Text,xm yp+24, For bug reports or suggestions email:
   Gui 2:Font,CBlue Underline
@@ -543,15 +619,15 @@ About:
   WinSet AlwaysOnTop
 Return
 
-Weblink:
-  Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+webHome:
+  Run, http://earth.tryse.net#programs,,UseErrorLevel
 Return
 
-Weblink2:
+webCode:
   Run, http://googleearth-autohotkey.googlecode.com,,UseErrorLevel
 Return
 
-Weblink3:
+webIM:
   Run, http://www.imagemagick.org/script/binary-releases.php#windows,,UseErrorLevel
 Return
 
@@ -565,3 +641,17 @@ AboutOk:
   Gui 1:-Disabled
   Gui 2:Destroy
 return
+
+SaveWinPos(HKCUswRegkey) {	; add SaveWinPos("my_program") in "GuiClose:" routine
+  WinGetPos, X, Y, , , A  ; "A" to get the active window's pos.
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\%HKCUswRegkey%, WindowX, %X%
+  RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\%HKCUswRegkey%, WindowY, %Y%
+}
+
+GetSavedWinPos(HKCURegkey) {	; add WinPos := GetSavedWinPos("my_program") before "Gui, Show, %WinPos%,.." command
+  RegRead, WindowX, HKEY_CURRENT_USER, SOFTWARE\%HKCURegkey%, WindowX
+  RegRead, WindowY, HKEY_CURRENT_USER, SOFTWARE\%HKCURegkey%, WindowY
+  If ((WindowX+200) > A_ScreenWidth or (WindowY+200) > A_ScreenHeight or WindowX < 0 or WindowY < 0)
+	return "Center"
+  return "X" WindowX " Y" WindowY
+}
