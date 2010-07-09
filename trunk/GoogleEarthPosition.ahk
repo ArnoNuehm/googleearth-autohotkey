@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.14   -   add new-version-check
 ; 1.13   -   Couple fixes for GE 5.1 (GetCamera returns FocusPointAltitudeMode = 5 which SetCameraParams doesn't take, crosshair path), Copy-LookAt shift to copy as php code
 ; 1.12   -   Feet/Meters option for Altitude/Range (default picked from GE), "/start" parameter to start the Google Earth application (thanks Alan Stewart for both), more tooltips
 ; 1.11   -   remember always-on-top
@@ -32,8 +33,8 @@
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
-#include _libGoogleEarth.ahk
-version = 1.13
+#include _libGoogleEarthCOM.ahk
+version = 1.14
 
 IfEqual, 1, /start
 {
@@ -59,6 +60,7 @@ Menu, context, add, Alt/Range Unit, :unit
 Menu, context, add,
 Menu, context, add, Show Crosshair, Crosshair
 Menu, context, add,
+Menu, context, add, Check for updates, webHome
 Menu, context, add, About, About
 If OnTop
 	Menu, context, Check, Always On Top
@@ -268,9 +270,10 @@ return
 Copy_LookAt_KML:
   GetKeyState, shiftstate, Shift
   If (shiftstate = "D")
-	clipboard = $kml .= flyTo(%FocusPointLatitude%, %FocusPointLongitude%, %RangeM%, %Tilt%, %Azimuth%, "bounce", 2);`n
+	clipboard = flyTo(%FocusPointLatitude%, %FocusPointLongitude%, %RangeM%, %Tilt%, %Azimuth%, "bounce", 2);`n
+	; clipboard = $kml .= flyTo(%FocusPointLatitude%, %FocusPointLongitude%, %RangeM%, %Tilt%, %Azimuth%, "bounce", 2);`n
   Else
-	clipboard = <LookAt>`n`t<longitude>%FocusPointLongitude%</longitude>`n`t<latitude>%FocusPointLatitude%</latitude>`n`t<altitude>%FocusPointAltitudeM%</altitude>`n`t<range>%RangeM%</range>`n`t<tilt>%Tilt%</tilt>`n`t<heading>%Azimuth%</heading>`n</LookAt>
+	clipboard := "`t<LookAt>`n`t`t<longitude>" . FocusPointLongitude . "</longitude>`n`t`t<latitude>" . FocusPointLatitude . "</latitude>`n`t`t<altitude>" . FocusPointAltitudeM . "</altitude>`n`t`t<range>" . RangeM . "</range>`n`t`t<tilt>" . Tilt . "</tilt>`n`t`t<heading>" . Azimuth . "</heading>`n`t</LookAt>`n"
 return
 
 SavePos:
@@ -371,7 +374,7 @@ Crosshair:
   CrosshairKml =
   (
 <?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://earth.google.com/kml/2.2">
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
 <ScreenOverlay>
 	<name>crosshair</name>
 	<Icon>
@@ -450,6 +453,7 @@ About:
   Gui 2:Font,Bold
   Gui 2:Add,Text,x+0 yp+10, Google Earth Position %version%
   Gui 2:Font
+  Gui 2:Add,Text,xm yp+16, by David Tryse
   Gui 2:Add,Text,xm yp+22, A tiny program for reading coordinates from the Google Earth client
   Gui 2:Add,Text,xm yp+15, (or edit coordinates to make Google Earth fly to a new location).
   Gui 2:Add,Text,xm yp+18, License: GPLv2+
@@ -460,8 +464,8 @@ About:
   Gui 2:Font
   Gui 2:Add,Text,xm yp+32, Check for updates here:
   Gui 2:Font,CBlue Underline
-  Gui 2:Add,Text,xm gWeblink yp+15, http://david.tryse.net/googleearth/
-  Gui 2:Add,Text,xm gWeblink2 yp+15, http://googleearth-autohotkey.googlecode.com
+  Gui 2:Add,Text,xm gwebHome yp+15, http://earth.tryse.net
+  Gui 2:Add,Text,xm gwebCode yp+15, http://googleearth-autohotkey.googlecode.com
   Gui 2:Font
   Gui 2:Add,Text,xm yp+24, For bug reports or suggestions email:
   Gui 2:Font,CBlue Underline
@@ -473,11 +477,11 @@ About:
   WinSet AlwaysOnTop
 Return
 
-Weblink:
-  Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+webHome:
+  Run, http://earth.tryse.net#programs,,UseErrorLevel
 Return
 
-Weblink2:
+webCode:
   Run, http://googleearth-autohotkey.googlecode.com,,UseErrorLevel
 Return
 
