@@ -15,6 +15,8 @@
 ; 
 ; Needs _libGoogleEarth.ahk library:  http://david.tryse.net/googleearth/
 ; 
+; 1.09   -   add new-version-check
+; 1.08   -   use _libGoogleEarth.ahk library without COM functions to avoid loading Windows Scripting environment
 ; 1.07   -   remember window position
 ; 1.06   -   use new _libGoogleEarth.ahk library 1.17 (handle "16 degrees 17 min, 56 secs south and 36 degrees 23 mins 44secs east")
 ; 1.05   -   use new _libGoogleEarth.ahk library (handles Deg Min and Deg format as well as Deg Min Sec)
@@ -24,11 +26,12 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.07
+version = 1.09
 
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop
 Menu, context, add,
+Menu, context, add, Check for updates, webHome
 Menu, context, add, About, About
 
 Gui, Font, bold
@@ -124,6 +127,7 @@ About:
   Gui 2:Font,Bold
   Gui 2:Add,Text,x+0 yp+10, LatLong Conversion %version%
   Gui 2:Font
+  Gui 2:Add,Text,xm yp+16, by David Tryse
   Gui 2:Add,Text,xm yp+22, A tiny program for converting coordinates between
   Gui 2:Add,Text,xm yp+15, Degree-Minute-Second and Decimal formats.
   Gui 2:Add,Text,xm+10 yp+20, Decimal format:
@@ -139,8 +143,8 @@ About:
   Gui 2:Add,Text,xm yp+22, License: GPLv2+
   Gui 2:Add,Text,xm yp+26, Check for updates here:
   Gui 2:Font,CBlue Underline
-  Gui 2:Add,Text,xm gWeblink yp+15, http://david.tryse.net/googleearth/
-  Gui 2:Add,Text,xm gWeblink2 yp+15, http://googleearth-autohotkey.googlecode.com
+  Gui 2:Add,Text,xm gwebHome yp+15, http://earth.tryse.net
+  Gui 2:Add,Text,xm gwebCode yp+15, http://googleearth-autohotkey.googlecode.com
   Gui 2:Font
   Gui 2:Add,Text,xm yp+24, For bug reports or suggestions email:
   Gui 2:Font,CBlue Underline
@@ -152,12 +156,16 @@ About:
   WinSet AlwaysOnTop
 Return
 
-Weblink:
-  Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+webHome:
+  Run, http://earth.tryse.net#programs,,UseErrorLevel
 Return
 
-Weblink2:
+webCode:
   Run, http://googleearth-autohotkey.googlecode.com,,UseErrorLevel
+Return
+
+Mapperlink:
+  Run, http://earth.google.com/outreach/tutorial_mapper.html,,UseErrorLevel
 Return
 
 Emaillink:
