@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.24   -   add new-version-check
 ; 1.23   -   fix GE 5.1 crosshair path, jpeg file association issue
 ; 1.22   -   register .jpg under HKCU instead of HKLM
 ; 1.21   -   use new _libGoogleEarth.ahk library 1.20 (fix for exiv2.exe in path containing space), fix balloon-style for GE5
@@ -42,7 +43,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarthCOM.ahk
-version = 1.23
+version = 1.24
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -163,6 +164,7 @@ Menu, context, add, Photo Description, :commentSrc
 Menu, context, add,
 Menu, context, add, Show Crosshair, Crosshair
 Menu, context, add,
+Menu, context, add, Check for updates, webHome
 Menu, context, add, About, About
 
 If OnTop
@@ -822,14 +824,15 @@ About:
   Gui 2:Font,Bold
   Gui 2:Add,Text,x+0 yp+10, Google Earth PhotoTag %version%
   Gui 2:Font
+  Gui 2:Add,Text,xm yp+16, by David Tryse
   Gui 2:Add,Text,xm yp+22, A small program for adding Exif GPS data to JPEG files
   Gui 2:Add,Text,xm yp+15, and reading coordinates from the Google Earth client.
   Gui 2:Add,Text,xm yp+18, License: GPLv2+
   Gui 2:Add,Button,gAssoc x40 yp+26 w200, &Add right-click options to JPEG files
   Gui 2:Add,Text,xm yp+36, Check for updates here:
   Gui 2:Font,CBlue Underline
-  Gui 2:Add,Text,xm gWeblink yp+15, http://david.tryse.net/googleearth/
-  Gui 2:Add,Text,xm gWeblink2 yp+15, http://googleearth-autohotkey.googlecode.com
+  Gui 2:Add,Text,xm gwebHome yp+15, http://earth.tryse.net
+  Gui 2:Add,Text,xm gwebCode yp+15, http://googleearth-autohotkey.googlecode.com
   Gui 2:Font
   Gui 2:Add,Text,xm yp+22, For bug reports or ideas email:
   Gui 2:Font,CBlue Underline
@@ -845,11 +848,11 @@ About:
   WinSet AlwaysOnTop
 Return
 
-Weblink:
-  Run, http://david.tryse.net/googleearth/,,UseErrorLevel
+webHome:
+  Run, http://earth.tryse.net#programs,,UseErrorLevel
 Return
 
-Weblink2:
+webCode:
   Run, http://googleearth-autohotkey.googlecode.com,,UseErrorLevel
 Return
 
