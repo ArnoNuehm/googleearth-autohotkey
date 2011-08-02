@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.15   -   add copy <gx:FlyTo> option, copy DMS coord option
 ; 1.14   -   add new-version-check
 ; 1.13   -   Couple fixes for GE 5.1 (GetCamera returns FocusPointAltitudeMode = 5 which SetCameraParams doesn't take, crosshair path), Copy-LookAt shift to copy as php code
 ; 1.12   -   Feet/Meters option for Altitude/Range (default picked from GE), "/start" parameter to start the Google Earth application (thanks Alan Stewart for both), more tooltips
@@ -34,7 +35,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarthCOM.ahk
-version = 1.14
+version = 1.15
 
 IfEqual, 1, /start
 {
@@ -88,7 +89,7 @@ Gui, Add, Text, x10, Range:
 Gui, Add, Edit, yp x140 w150 vRange,
 Gui, Add, Text, x10, Tilt:
 Gui, Add, Edit, yp x140 w150 vTilt,
-Gui, Add, Text, x10, Azimuth:
+Gui, Add, Text, x10, Heading:
 Gui, Add, Edit, yp x140 w150 vAzimuth,
 Gui, Add, Text, x10, Terrain Altitude:
 Gui, Add, Edit, yp x140 w150 vAltitude ReadOnly,
@@ -119,8 +120,8 @@ SavedPos5_TT := "Click to load a previously saved position.`nPress Shift and cli
 SavedPos6_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
 Copy_LatLong_TT := "Copy Latitude and Longitude to the clipboard (separated by a tab) `n(hold down Shift to copy separated by a comma)"
 Copy_LatLong_KML_TT := "Copy Latitude and Longitude to the clipboard in KML format "
-Copy_LookAt_TT := "Copy LookAt parameters (current viewpoint) to the clipboard (tab separated)`n(hold down Shift to copy comma separated)"
-Copy_LookAt_KML_TT := "Copy LookAt parameters (current viewpoint) to the clipboard in KML format"
+Copy_LookAt_TT := "Copy LookAt parameters (current viewpoint) to the clipboard (tab separated) `n(hold down Shift to copy comma separated)"
+Copy_LookAt_KML_TT := "Copy LookAt parameters (current viewpoint) to the clipboard in KML format `n(hold down Shift to copy as a <gx:FlyTo> tag, for tours)"
 ;Altitude_TT := "The terrain altitude of the current focus point, in meters/feet (change unit in right-click menu).`nEnabling the option to Read Altitude (in the right-click menu) may slow down Google Earth."
 Azimuth_TT := "Rotation of the current view, in degrees (between -180 and 180)"
 Tilt_TT := "Tilt of the current view, in degrees (between 0 and 90)"
@@ -133,8 +134,9 @@ GetPos_TT := "Read current coordinates and viewpoint information from Google Ear
 FlyTo_TT := "Fly Google Earth to the coordinates and viewpoint entered above"
 Speed_TT := "How fast Google Earth should fly to a new position"
 
-Gui Add, StatusBar, vStatusBar
+Gui Add, StatusBar, vStatusBar gStatusBar
 SB_SetText("  Google Earth is not running ")
+StatusBar_TT := ""
 
 WinPos := GetSavedWinPos("GoogleEarthPosition")
 Gui, Show, %WinPos%, Google Earth Position %version%
@@ -188,6 +190,7 @@ GetPos:
   If not IsGErunning()
   {
 	SB_SetText("  Google Earth is not running ")
+	StatusBar_TT := ""
 	return
   }
   oldFocusPointLatitude := FocusPointLatitude
@@ -237,9 +240,11 @@ GetPos:
 	GuiControl,, Azimuth, %Azimuth%
   If (PointAltitude != oldPointAltitude)
 	GuiControl,, Altitude, %PointAltitude%
-  If (DMSCoord != oldDMSCoord)
+  If (DMSCoord != oldDMSCoord) {
 	SB_SetText("   DMS Coordinates:   " DMSCoord)
+	StatusBar_TT := "Double-click to copy the DMS coordinates"
 	;GuiControl,, DMSCoord, %DMSCoord%
+  }
   GuiControl,, Speed, %Speed%
 return
 
@@ -268,12 +273,16 @@ Copy_LatLong_KML:
 return
 
 Copy_LookAt_KML:
+  GetKeyState, altstate, Alt
   GetKeyState, shiftstate, Shift
-  If (shiftstate = "D")
+  If (altstate = "D") {
 	clipboard = flyTo(%FocusPointLatitude%, %FocusPointLongitude%, %RangeM%, %Tilt%, %Azimuth%, "bounce", 2);`n
+  } Else If (shiftstate = "D") {
+	clipboard := "`t<gx:FlyTo>`n`t`t<gx:duration>5</gx:duration>`n`t`t<gx:flyToMode>bounce</gx:flyToMode>`n`t`t<LookAt>`n`t`t`t<longitude>" . FocusPointLongitude . "</longitude>`n`t`t`t<latitude>" . FocusPointLatitude . "</latitude>`n`t`t`t<altitude>" . FocusPointAltitudeM . "</altitude>`n`t`t`t<range>" . RangeM . "</range>`n`t`t`t<tilt>" . Tilt . "</tilt>`n`t`t`t<heading>" . Azimuth . "</heading>`n`t`t</LookAt>`n`t</gx:FlyTo>`n"
 	; clipboard = $kml .= flyTo(%FocusPointLatitude%, %FocusPointLongitude%, %RangeM%, %Tilt%, %Azimuth%, "bounce", 2);`n
-  Else
+  } Else {
 	clipboard := "`t<LookAt>`n`t`t<longitude>" . FocusPointLongitude . "</longitude>`n`t`t<latitude>" . FocusPointLatitude . "</latitude>`n`t`t<altitude>" . FocusPointAltitudeM . "</altitude>`n`t`t<range>" . RangeM . "</range>`n`t`t<tilt>" . Tilt . "</tilt>`n`t`t<heading>" . Azimuth . "</heading>`n`t</LookAt>`n"
+  }
 return
 
 SavePos:
@@ -324,6 +333,10 @@ SavePos:
   }
 return
 
+StatusBar:
+  If (A_GuiEvent = "DoubleClick")
+	clipboard := DMSCoord
+return
 
 WM_MOUSEMOVE() {
     static CurrControl, PrevControl, _TT  ; _TT is kept blank for use by the ToolTip command below.
