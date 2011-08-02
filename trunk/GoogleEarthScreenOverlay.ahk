@@ -8,19 +8,24 @@
 ; A small program for adding screen overlay images to Google Earth.
 ; 
 ; Version history:
-; 1.01   -   
+; 1.01   -   Add DrawOrder option, make it possible to edit several overlays at once (use unique tmp file names, add menu option to open more copies of the program)
 
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
-version = 1.00
+version = 1.01
 
 RegRead OnTop, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthScreenOverlay, OnTop
 IfEqual, OnTop,
 	OnTop := 1
 
+Random, rnd, 0, 9999999
+KMLfile := A_Temp "\GoogleEarthScreenOverlay_"  rnd "_tmp.kml"
+KMLfile_nw := A_Temp "\GoogleEarthScreenOverlay_" rnd "_nw.kml"
+
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop
+Menu, context, add, Open another window, AddWindow
 Menu, context, add,
 Menu, context, add, Check for updates, webHome
 Menu, context, add, About, About
@@ -138,6 +143,12 @@ Gui, Font, norm
 Gui, Add, ComboBox, yp-3 xp+54 w60 Choose1 gUpdateKML vRotate, 0|-45|-90|-135|45|90|135|180
 Transparency_TT := "Make the image semi-transparent in Google Earth."
 Rotate_TT := "Rotate the image by a number of degrees."
+; ================================================================================
+; Gui, Font, bold
+Gui, Add, Text, yp+30 xm+5, Draw Order:
+Gui, Font, norm
+Gui, Add, ComboBox, yp-3 xp+106 w60 Choose1 gUpdateKML vdrawOrder, 0|1|2|3|4|5|-1|-2|-3|-4|-5
+drawOrder_TT := "Images with a higher Draw Order are drawn on top of other images in case images overlap on the screen"
 ; ================================================================================
 
 Gui, Font, bold
@@ -265,7 +276,6 @@ Opacity := 0xff-Transparency
 StringReplace, Opacity, Opacity, 0x
 SetFormat, IntegerFast, d
 SplitPath, ImageFile,, Dir,, Name
-KMLfile := A_Temp "\GoogleEarthScreenOverlay_tmp.kml"
 KML =
 (
 <?xml version="1.0" encoding="UTF-8"?>
@@ -280,6 +290,7 @@ KML =
 	  <screenXY x="%ScreenX%" y="%ScreenY%" xunits="%ScreenXunit%" yunits="%ScreenYunit%"/>
 	  <overlayXY x="%ImageX%" y="%ImageY%" xunits="%ImageXunit%" yunits="%ImageYunit%"/>
 	  <rotation>%Rotate%</rotation>
+	  <drawOrder>%drawOrder%</drawOrder>
 	  <size x="%SizeX%" y="%SizeY%" xunits="%SizeXunit%" yunits="%SizeYunit%"/>
 	</ScreenOverlay>
 </Document>
@@ -315,7 +326,6 @@ return
 
 KMLOpen:
 	Gosub UpdateKML
-	KMLfile_nw := A_Temp "\GoogleEarthScreenOverlay_nw.kml"
 	KML_nw =
 	(
 	<?xml version="1.0" encoding="UTF-8"?>
@@ -337,7 +347,7 @@ KMLOpen:
 return
 
 OpenKmlDialog:
-  FileSelectFile, SelectedFile, 3, , Open a KML file with a <GroundOverlay> tag..., KML files (*.kml)
+  FileSelectFile, SelectedFile, 3, , Open a KML file with a <ScreenOverlay> tag..., KML files (*.kml)
   IfEqual SelectedFile,, return
   CoordFromKML(SelectedFile)
 return
@@ -414,6 +424,10 @@ WM_MOUSEMOVE() {
 
 reload:
   Reload
+return
+
+AddWindow:
+Run, %A_ScriptFullPath%
 return
 
 OnTop:
