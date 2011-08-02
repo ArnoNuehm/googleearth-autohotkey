@@ -11,6 +11,7 @@
 ; Needs convert.exe and idenfity.exe from ImageMagick:  http://www.imagemagick.org/
 ; 
 ; Version history:
+; 1.05   -   add partial support for GeoTiff files using bundled listgeo.exe (only reads top-left and bottom-right corner coordinates to get north/south/east/west - not perfect for files with rotated/skewed fit)
 ; 1.04   -   read coordinates from KML file <GroundOverlay> tag, remember screen position/foder/coords, open folder button, open in GE button, new-version-check, fix "0" as coordinate bug
 ; 1.03   -   fix ImageMagick path issue, use cmdret.dll
 ; 1.02   -   add network-link kml hierarchy output, fix progress bar
@@ -20,8 +21,10 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.04
+version = 1.05
 FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1	; bundle cmdret.dll in executable (avoids temp files when capturing cmdline output)
+FileInstall listgeo.exe, %A_Temp%\listgeo.exe, 1	; to get corner coordinates from GeoTiff files
+ListGeo := A_Temp "\listgeo.exe"
 
 ; ------------ find ImageMagick tools identify.exe / convert.exe -----------
 RegRead, ImageMagickPath, HKEY_LOCAL_MACHINE, SOFTWARE\ImageMagick\Current, BinPath
@@ -145,7 +148,7 @@ Gui Add, Button, yp xp+119 w137 h23 gKMLOpen, Open in Google Earth
 ; Gui Add, Button, yp+29 xm+65 w112 h23 gFolderOpen, Open Output Folder
 ; Gui Add, Button, yp xp+119 w137 h23 gKMLOpen, Open in Google Earth
 
-Gui, Add, Progress, xm w321 h14 vProgressBar
+Gui, Add, Progress, xm w321 h14 vProgressBar -Smooth
 Gui Add, StatusBar, vStatusBar
 
 ; Gui, Add, Button, ym xm greload hidden, reloa&d
@@ -188,7 +191,7 @@ Make:
   makeimg = 1
   makekml = 1
   If (FileExist(OutFolder "\tile_?_????_????.???")) {
-	MsgBox, 3, Image tiles already exist!, This folder already contains tile_*.* image files.`n Press YES to keep these files and only create new kml output.`n Press NO to recreate both image files and kml (slower). `n Press Cancel to abort and change settings.
+	MsgBox, 3, Image tiles already exist! Reuse them?, This folder already contains tile_*.* image files.`n Press YES to keep these files and only create new kml output.`n Press NO to recreate both image files and kml (slower). `n Press Cancel to abort and change settings.
 	IfMsgBox Yes
 		makeimg :=
 	IfMsgBox Cancel
@@ -431,6 +434,9 @@ OpenFile:
 	CoordFromKML(SelectedFile)
 	return
   }
+  If (Ext == "tif") {
+	CoordFromTif(SelectedFile, ListGeo)
+  }
   GuiControl,, ImageFile,
   GuiControl,, ImageWidth,...
   GuiControl,, ImageHeight,...
@@ -455,10 +461,10 @@ return
 
 CoordFromKML(kmlcoordfile) {
 	FileRead kmlcode, %kmlcoordfile%
-	RegExMatch(kmlcode, "s).*<GroundOverlay>.*<LatLonBox>.*<north>([0-9\.-]*)</north>.*</LatLonBox>.*</GroundOverlay>.*", kmlnorth)
-	RegExMatch(kmlcode, "s).*<GroundOverlay>.*<LatLonBox>.*<south>([0-9\.-]*)</south>.*</LatLonBox>.*</GroundOverlay>.*", kmlsouth)
-	RegExMatch(kmlcode, "s).*<GroundOverlay>.*<LatLonBox>.*<west>([0-9\.-]*)</west>.*</LatLonBox>.*</GroundOverlay>.*", kmlwest)
-	RegExMatch(kmlcode, "s).*<GroundOverlay>.*<LatLonBox>.*<east>([0-9\.-]*)</east>.*</LatLonBox>.*</GroundOverlay>.*", kmleast)
+	RegExMatch(kmlcode, "s).*<GroundOverlay.*<LatLonBox>.*<north>([0-9\.-]*)</north>.*</LatLonBox>.*</GroundOverlay>.*", kmlnorth)
+	RegExMatch(kmlcode, "s).*<GroundOverlay.*<LatLonBox>.*<south>([0-9\.-]*)</south>.*</LatLonBox>.*</GroundOverlay>.*", kmlsouth)
+	RegExMatch(kmlcode, "s).*<GroundOverlay.*<LatLonBox>.*<west>([0-9\.-]*)</west>.*</LatLonBox>.*</GroundOverlay>.*", kmlwest)
+	RegExMatch(kmlcode, "s).*<GroundOverlay.*<LatLonBox>.*<east>([0-9\.-]*)</east>.*</LatLonBox>.*</GroundOverlay>.*", kmleast)
 	If (kmlnorth1 != "" and kmlsouth1 != "" and kmlwest1 != "" and kmleast1 != "") {
 		GuiControl,, LongitudeNorth, %kmlnorth1%
 		GuiControl,, LongitudeSouth, %kmlsouth1%
@@ -466,6 +472,27 @@ CoordFromKML(kmlcoordfile) {
 		GuiControl,, LatitudeEast, %kmleast1%
 	} else {
 		Msgbox,48, No GroundOverlay coordinates found!, Error: Cannot find GroundOverlay LatLonBox coordinates in %kmlcoordfile%.
+	}
+}
+
+CoordFromTif(imagefile, ListGeo) {
+	CMD := """" ListGeo """ """ imagefile """"
+	captureOutput(CMD, StrOut)
+	RegExMatch(StrOut, "Upper\s*Left\s*\([0-9\s\,\.]*\)\s*\((.*),(.*)\)", geotifTL)
+	RegExMatch(StrOut, "Lower\s*Right\s*\([0-9\s\,\.]*\)\s*\((.*),(.*)\)", geotifLR)
+	tifnorth1 := Deg2Dec(geotifTL2 "," geotifTL1, "lat")
+	tifwest1 := Deg2Dec(geotifTL2 "," geotifTL1, "long")
+	tifsouth1 := Deg2Dec(geotifLR2 "," geotifLR1, "lat")
+	tifeast1 := Deg2Dec(geotifLR2 "," geotifLR1, "long")
+	If (tifnorth1 != "" and tifsouth1 != "" and tifwest1 != "" and tifeast1 != "") {
+		MsgBox, 4, Load coordinates from GeoTiff file?, GoogleEarthTiler can read the north/south/east/west coordinates from the top-left and bottom-right corner coordinates stored inside this GeoTiff file.`n(top-right and bottom-left coordinates are ignored and files with a rotated or skewed fit may not line up 100`% correctly)`n`nLoad coordinates from this GeoTiff file?
+		IfMsgBox Yes
+		{
+			GuiControl,, LongitudeNorth, %tifnorth1%
+			GuiControl,, LongitudeSouth, %tifsouth1%
+			GuiControl,, LatitudeWest, %tifwest1%
+			GuiControl,, LatitudeEast, %tifeast1%
+		}
 	}
 }
 
