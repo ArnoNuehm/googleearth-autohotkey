@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.25   -   nothing new, up version number to release new executables of all tools without UPX compression (AV issues)
 ; 1.24   -   add new-version-check
 ; 1.23   -   fix GE 5.1 crosshair path, jpeg file association issue
 ; 1.22   -   register .jpg under HKCU instead of HKLM
@@ -43,7 +44,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #Include _libGoogleEarthCOM.ahk
-version = 1.24
+version = 1.25
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
