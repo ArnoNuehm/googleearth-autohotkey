@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.21
+; _libGoogleEarth.ahk  version 1.23
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.23   -   add GEfeature() function for hiding/showing GE Layers (even while movie recorder is running)
 ; 1.22   -   split into _libGoogleEarth.ahk and _libGoogleEarthCOM.ahk (avoid loading Windows Scripting env and COM API functions in LatLongConversion/GoogleEarthTiler)
 ; 1.21   -   IsGEinit() function to check if Google Earth is initialized (returns 0 if logged out from server, 1 if ready & starts GE if not already running)
 ; 1.20   -   fix for exiv2.exe in path containing space (thanks Jim Smith for bug report)
@@ -52,6 +53,8 @@ VBCode =
    Dim Speed
    Dim pointPos
    Dim googleEarthTime
+   Dim layer
+   Dim display
   
    Function testGe()
 	Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
@@ -83,6 +86,11 @@ VBCode =
    Function geTimePause()
 	Set googleEarthTime = CreateObject("GoogleEarth.AnimationControllerGE")
 	googleEarthTime.Pause()
+   end Function
+
+   Function geFeature(layer,display)
+	Set googleEarth = CreateObject("GoogleEarth.ApplicationGE")
+	googleEarth.GetFeatureByName(layer).Visibility = display
    end Function
 
 )
@@ -179,5 +187,12 @@ GEtimePlay() {
 GEtimePause() {
 	wsfunction = geSetPos(%FocusPointLatitude%, %FocusPointLongitude%, %FocusPointAltitude%, %FocusPointAltitudeMode%, %Range%, %Tilt%, %Azimuth%, %Speed%)
 	WS_Eval(returnval, "geTimePause()")
+	return returnval
+}
+
+;call with GEfeature("Trees",1) - for hiding/showing GE Layers (even while movie recorder is running)
+GEfeature(layer,display) {
+	wsfunction = geFeature("%layer%",%display%)
+	WS_Eval(returnval, wsfunction)
 	return returnval
 }
