@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.21
+; _libGoogleEarth.ahk  version 1.23
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ ) (only in _libGoogleEarthCOM.ahk)
 ;
 ; Version history:
+; 1.23   -   fix IsGErunning() and ImageDim()
 ; 1.22   -   split into _libGoogleEarth.ahk and _libGoogleEarthCOM.ahk (avoid loading Windows Scripting env and COM API functions in LatLongConversion/GoogleEarthTiler)
 ; 	     -   fix non-cmdret.dll captureOutput() function
 ; 1.21   -   IsGEinit() function to check if Google Earth is initialized (returns 0 if logged out from server, 1 if ready & starts GE if not already running)
@@ -52,6 +53,8 @@ Deg2Dec(DegCoord, mode = "both") {
 	StringReplace DegCoord,DegCoord,deg,%A_Space%,All
 	StringReplace DegCoord,DegCoord,d,%A_Space%,All
 	StringReplace DegCoord,DegCoord,°,%A_Space%,All
+	StringReplace DegCoord,DegCoord,º,%A_Space%,All
+	StringReplace DegCoord,DegCoord,`;,%A_Space%,All
 	StringReplace DegCoord,DegCoord,minutes,%A_Space%,All
 	StringReplace DegCoord,DegCoord,minute,%A_Space%,All
 	StringReplace DegCoord,DegCoord,mins,%A_Space%,All
@@ -214,7 +217,7 @@ Dec2Rel(DecCoord, mode = "both") {
 ; simple check if the Google Earth client is running or not
 IsGErunning() {
 	SetTitleMatchMode 2	; change from 3 to 2 to match also Google Earth Pro etc. - thanks Marty Michener
-	If WinExist("Google Earth") and WinExist("ahk_class QWidget")
+	If WinExist("Google Earth") and WinExist("ahk_class QWidget", "LayerWidget")
 	    return 1
 	return 0
 }
@@ -397,7 +400,7 @@ ImageDim(fullfilename, byref ImgWidth, byref ImgHeight, ImageMagickTool = "", sk
 	If not (ImageMagickTool)
 		ImageMagickTool := findFile("identify.exe")
 	If (ImageMagickTool) {
-		CMD := """" ImageMagickTool """ -ping -format ""%wx%hx"" """ fullfilename """" ; shows 640x480x - 2nd x to avoid including linefeed when splitting string below
+		CMD := """" ImageMagickTool """ -quiet -ping -format ""%wx%hx"" """ fullfilename """" ; shows 640x480x - 2nd x to avoid including linefeed when splitting string below
 		captureOutput(CMD, StrOut)
 		If (SubStr(StrOut, 1, 12) == "identify.exe") {
 			return 3
