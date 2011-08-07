@@ -8,13 +8,23 @@
 ; Creates a small GUI to modify hotkeys for showing/hiding layers within the Google Earth client
 ;
 ; Needs _libGoogleEarth.ahk library:  http://earth.tryse.net/
+;
+; Version history:
+; 1.02   -   better match GE windows (without matching other QWidget windows), + fix icon, remove need for MSVCR71.dll
 
 
 #NoEnv
 #SingleInstance force
 #include _libGoogleEarthCOM.ahk
-version = 1.01
+version = 1.02
 title = Google Earth Hotkeys %version%
+
+SetTitleMatchMode RegEx
+GroupAdd, ge_grp, Google Earth ahk_class QWidget		; make hotkeys work in Google Earth main window
+GroupAdd, ge_grp, ahk_class QWidget, LayerWidget		; make hotkeys work in Google Earth main window
+GroupAdd, ge_grp, Movie Maker ahk_class QWidget		; make hotkeys work with Google Earth Pro movie maker
+GroupAdd, ge_grp, ahk_class QWidget,,,..*,		; make hotkeys work in Google Earth popup balloons (..hopefully without matching other Qt UI like Qsvn etc. - GE popups have window class but no title or window text to match on)
+GroupAdd, ge_grp, %title%		; make hotkeys work with hotkey config window open
 
 ; ---------------- handle command line parameters -------------------
 IfEqual, 1, /start
@@ -196,7 +206,9 @@ Load:
 	GuiControl,Text, sF12, %sF12%
 return
 
-#IfWinActive ahk_class QWidget, LayerWidget			; === Google Earth ===
+#IfWinActive ahk_group ge_grp 			; === match Google Earth windows ===
+; #IfWinActive Google Earth ahk_class QWidget
+; #IfWinActive ahk_class QWidget, LayerWidget
 	F1::launchKey(A_ThisHotkey)
 	+F1::launchKey(A_ThisHotkey)
 	F2::launchKey(A_ThisHotkey)
