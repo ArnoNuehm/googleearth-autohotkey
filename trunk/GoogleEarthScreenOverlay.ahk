@@ -8,12 +8,13 @@
 ; A small program for adding screen overlay images to Google Earth.
 ; 
 ; Version history:
+; 1.02   -   add up-down arrows to the X/Y edit controls, +fix icon, remove need for MSVCR71.dll
 ; 1.01   -   Add DrawOrder option, make it possible to edit several overlays at once (use unique tmp file names, add menu option to open more copies of the program)
 
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
-version = 1.01
+version = 1.02
 
 RegRead OnTop, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthScreenOverlay, OnTop
 IfEqual, OnTop,
@@ -57,13 +58,13 @@ Gui Add, Button, xp+30 yp w26 vScreenXYbr gScreenXYbr, æ
 ; ëéìçlèíêî		bold arrows
 Gui, font,, Verdana
 Gui, Add, Text, yp-36 xm+120, &X:
-Gui, Add, Edit, yp-3 xp+20 w46 vScreenX gUpdateKML, %ScreenX%
-; Gui, Add, UpDown, vMyUpDown, 0.01
-Gui, Add, DropDownList, yp xp+56 w86 Choose1 gUpdateKML vScreenXunit, fraction|pixels|insetPixels
+Gui, Add, Edit, yp-3 xp+20 w62 +right vScreenX gUpdateKML, %ScreenX%
+Gui, Add, UpDown, gArrowsControl vUpDownScreenX Range-9999-9999 0x80 Horz 16
+Gui, Add, DropDownList, yp xp+70 w86 Choose1 gUpdateKML vScreenXunit, fraction|pixels|insetPixels
 Gui, Add, Text, yp+30 xm+120, &Y:
-Gui, Add, Edit, yp-3 xp+20 w46 vScreenY gUpdateKML, %ScreenY%
-; Gui, Add, UpDown, vMyUpDown2 Horz 16, 0.01
-Gui, Add, DropDownList, yp xp+56 w86 Choose1 gUpdateKML vScreenYunit, fraction|pixels|insetPixels
+Gui, Add, Edit, yp-3 xp+20 w62 +right vScreenY gUpdateKML, %ScreenY%
+Gui, Add, UpDown,  gArrowsControl vUpDownScreenY Range-9999-9999 0x80
+Gui, Add, DropDownList, yp xp+70 w86 Choose1 gUpdateKML vScreenYunit, fraction|pixels|insetPixels
 ScreenXYtl_TT := "Position image in the top-left corner of the screen."
 ScreenXYtc_TT := "Position image centered at the top of the screen."
 ScreenXYtr_TT := "Position image in the top-right corner of the screen."
@@ -95,11 +96,13 @@ Gui Add, Button, xp+30 yp w26 vImageXYbc gImageXYbc, á
 Gui Add, Button, xp+30 yp w26 vImageXYbr gImageXYbr, ã
 Gui, font,, Verdana
 Gui, Add, Text, yp-36 xm+120, X:
-Gui, Add, Edit, yp-3 xp+20 w46 vImageX gUpdateKML, %ImageX%
-Gui, Add, DropDownList, yp xp+56 w86 Choose1 gUpdateKML vImageXunit, fraction|pixels|insetPixels
+Gui, Add, Edit, yp-3 xp+20 w62 +right vImageX gUpdateKML, %ImageX%
+Gui, Add, UpDown, gArrowsControl vUpDownImageX Range-9999-9999 0x80 Horz 16
+Gui, Add, DropDownList, yp xp+70 w86 Choose1 gUpdateKML vImageXunit, fraction|pixels|insetPixels
 Gui, Add, Text, yp+30 xm+120, Y:
-Gui, Add, Edit, yp-3 xp+20 w46 vImageY gUpdateKML, %ImageY%
-Gui, Add, DropDownList, yp xp+56 w86 Choose1 gUpdateKML vImageYunit, fraction|pixels|insetPixels
+Gui, Add, Edit, yp-3 xp+20 w62 +right vImageY gUpdateKML, %ImageY%
+Gui, Add, UpDown,  gArrowsControl vUpDownImageY Range-9999-9999 0x80
+Gui, Add, DropDownList, yp xp+70 w86 Choose1 gUpdateKML vImageYunit, fraction|pixels|insetPixels
 ImageXYtl_TT := "Anchor at top-left corner within the image."
 ImageXYtc_TT := "Anchor at top edge within the image"
 ImageXYtr_TT := "Anchor at top-right corner within the image."
@@ -123,11 +126,13 @@ Gui Add, Button, xm+8  yp+17 w130 gSizeNative, Native Size
 Gui Add, Button, xm+8  yp+26 w130 gSize20Width, 20`% of screen width
 Gui Add, Button, xm+8  yp+26 w130 gSize30Height, 30`% of screen height
 Gui, Add, Text, yp-36 xm+150, X:
-Gui, Add, Edit, yp-3 xp+20 w46 vSizeX gUpdateKML, %ImageX%
-Gui, Add, DropDownList, yp xp+56 w72 Choose1 gUpdateKML vSizeXunit, fraction|pixels
+Gui, Add, Edit, yp-3 xp+20 w62 +right vSizeX gUpdateKML, %ImageX%
+Gui, Add, UpDown,  gArrowsControl vUpDownSizeX Range-9999-9999 0x80 Horz 16
+Gui, Add, DropDownList, yp xp+70 w72 Choose1 gUpdateKML vSizeXunit, fraction|pixels
 Gui, Add, Text, yp+30 xm+150, Y:
-Gui, Add, Edit, yp-3 xp+20 w46 vSizeY gUpdateKML, %ImageY%
-Gui, Add, DropDownList, yp xp+56 w72 Choose1 gUpdateKML vSizeYunit, fraction|pixels
+Gui, Add, Edit, yp-3 xp+20 w62 +right vSizeY gUpdateKML, %ImageY%
+Gui, Add, UpDown,  gArrowsControl vUpDownSizeY Range-9999-9999 0x80
+Gui, Add, DropDownList, yp xp+70 w72 Choose1 gUpdateKML vSizeYunit, fraction|pixels
 SizeX_TT := "Size of image along the X (horizontal) axis of the screen.`nUse -1 to keep the image native dimensions.`nUse 0 for either X or Y to maintain the image aspect ratio."
 SizeY_TT := "Size of image along the Y (vertical) axis of the screen.  `nUse -1 to keep the image native dimensions.`nUse 0 for either X or Y to maintain the image aspect ratio."
 SizeXunit_TT := "Unit for the horizontal size of the image.`nfraction : 0.1 is 10% of the screen width, 1 is the full width of the screen.  `npixels : specify horizontal size in pixels."
@@ -165,8 +170,34 @@ Gui +LastFound
 If OnTop
 	WinSet AlwaysOnTop
 OnMessage(0x200, "WM_MOUSEMOVE")
-SetTimer, UpdateKMLGO, 200
+SetFormat Float, 0.2
+SetTimer, UpdateKMLGO, 400
 return
+
+; http://www.autohotkey.com/forum/topic13109.html
+ArrowsControl:
+	UpDownValue := % %A_GuiControl%		; Get the proposed new value for the UpDown arrow (one step higher or lower than the current, depending on the arrow clicked)
+	StringReplace TextControlID, A_GuiControl, UpDown, 	; Get the name of the edit control
+	CurrentValue := %TextControlID%		; Get the current value in the edit control
+	CurrentUnit := % %TextControlID%unit	; Find the unit (pixels, fraction)
+	
+	If (CurrentUnit = "fraction") {
+		step = 0.01
+	} Else {
+		step = 1
+		CurrentValue := Round(CurrentValue)
+	}
+
+	If (UpDownValue < CurrentValue)
+		NewValue := CurrentValue - step
+	Else
+		NewValue := CurrentValue + step
+
+	; Change the value of the UpDown control to 0 again, and change the Edit control to its new value
+	GuiControl ,, % A_GuiControl, 0
+	GuiControl ,, % TextControlID, %NewValue%
+	Gui Submit, NoHide
+Return
 
 ; ================================================================================
 ScreenXYtl:
@@ -262,13 +293,13 @@ SetSizeXY(x,y) {
 ; ================================================================================
 
 UpdateKML:
-needupdate = 1
+needupdate = 2
 return
 
 UpdateKMLGO:
 If (!needupdate)
 	return
-Gui, Submit, NoHide
+Gui Submit, NoHide
 StringReplace, Transparency, Transparency, `%
 Transparency := Round(Transparency/100*255)
 SetFormat, IntegerFast, hex
@@ -299,7 +330,10 @@ KML =
 FileDelete, %KMLfile%
 IfNotExist, %KMLfile%
 	FileAppend, %KML%, %KMLfile%
-needupdate = 0
+if (needupdate = 2)
+	needupdate = 1
+else
+	needupdate = 0
 return
 
 OpenFileDialog:
