@@ -11,6 +11,7 @@
 ; Needs convert.exe and idenfity.exe from ImageMagick:  http://www.imagemagick.org/
 ; 
 ; Version history:
+; 1.06   -   no code changes, fix icon, remove need for MSVCR71.dll
 ; 1.05   -   add partial support for GeoTiff files using bundled listgeo.exe (only reads top-left and bottom-right corner coordinates to get north/south/east/west - not perfect for files with rotated/skewed fit)
 ; 1.04   -   read coordinates from KML file <GroundOverlay> tag, remember screen position/foder/coords, open folder button, open in GE button, new-version-check, fix "0" as coordinate bug
 ; 1.03   -   fix ImageMagick path issue, use cmdret.dll
@@ -21,7 +22,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.05
+version = 1.06
 FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1	; bundle cmdret.dll in executable (avoids temp files when capturing cmdline output)
 FileInstall listgeo.exe, %A_Temp%\listgeo.exe, 1	; to get corner coordinates from GeoTiff files
 ListGeo := A_Temp "\listgeo.exe"

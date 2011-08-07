@@ -15,6 +15,7 @@
 ; 
 ; Needs _libGoogleEarth.ahk library:  http://david.tryse.net/googleearth/
 ; 
+; 1.11   -   no code changes, fix icon, remove need for MSVCR71.dll
 ; 1.10   -   nothing new, up version number to release new executables of all tools without UPX compression (AV issues)
 ; 1.09   -   add new-version-check
 ; 1.08   -   use _libGoogleEarth.ahk library without COM functions to avoid loading Windows Scripting environment
@@ -27,7 +28,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.10
+version = 1.11
 
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop

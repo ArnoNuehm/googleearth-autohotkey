@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.16   -   no code changes, fix icon, remove need for MSVCR71.dll
 ; 1.15   -   add copy <gx:FlyTo> option, copy DMS coord option
 ; 1.14   -   add new-version-check
 ; 1.13   -   Couple fixes for GE 5.1 (GetCamera returns FocusPointAltitudeMode = 5 which SetCameraParams doesn't take, crosshair path), Copy-LookAt shift to copy as php code
@@ -35,7 +36,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarthCOM.ahk
-version = 1.15
+version = 1.16
 
 IfEqual, 1, /start
 {
@@ -104,7 +105,7 @@ Gui, Add, Button, x10 w120 gCopy_LatLong vCopy_LatLong, &Copy LatLong
 Gui, Add, Button, yp x140 w120 gCopy_LookAt vCopy_LookAt, Copy Look&At
 Gui, Add, Button, x10 w120 gCopy_LatLong_KML vCopy_LatLong_KML, Copy LatLong K&ML
 Gui, Add, Button, yp x140 w120 gCopy_LookAt_KML vCopy_LookAt_KML, Copy LookAt KM&L
-Gui Add, Button, yp x0 hidden greload, reloa&d
+; Gui Add, Button, yp x0 hidden greload, reloa&d
 
 Gui, Add, Button, yp+35 x10 w40 h20 gSavePos vSavedPos1, 1
 Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos2, 2
@@ -189,7 +190,8 @@ Loop {
 GetPos:
   If not IsGErunning()
   {
-	SB_SetText("  Google Earth is not running ")
+	if (StatusBar_TT)
+		SB_SetText("  Google Earth is not running ")
 	StatusBar_TT := ""
 	return
   }
