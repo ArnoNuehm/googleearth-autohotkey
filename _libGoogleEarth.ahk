@@ -17,6 +17,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ ) (only in _libGoogleEarthCOM.ahk)
 ;
 ; Version history:
+; 1.24   -   fix IsGErunning()
 ; 1.23   -   fix IsGErunning() and ImageDim()
 ; 1.22   -   split into _libGoogleEarth.ahk and _libGoogleEarthCOM.ahk (avoid loading Windows Scripting env and COM API functions in LatLongConversion/GoogleEarthTiler)
 ; 	     -   fix non-cmdret.dll captureOutput() function
@@ -217,7 +218,8 @@ Dec2Rel(DecCoord, mode = "both") {
 ; simple check if the Google Earth client is running or not
 IsGErunning() {
 	SetTitleMatchMode 2	; change from 3 to 2 to match also Google Earth Pro etc. - thanks Marty Michener
-	If WinExist("Google Earth") and WinExist("ahk_class QWidget", "LayerWidget")
+	; If WinExist("Google Earth") and WinExist("ahk_class QWidget", "LayerWidget")
+	If WinExist("Google Earth ahk_class QWidget")
 	    return 1
 	return 0
 }
