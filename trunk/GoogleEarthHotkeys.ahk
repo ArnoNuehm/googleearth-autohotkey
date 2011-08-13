@@ -10,13 +10,14 @@
 ; Needs _libGoogleEarth.ahk library:  http://earth.tryse.net/
 ;
 ; Version history:
+; 1.03   -   start the layer list with an equal sign to toggle between hiding and showing each layer on the list (doesn't know if the layer is shown or not beforehand, so may need to press twice to show the first time..)
 ; 1.02   -   better match GE windows (without matching other QWidget windows), + fix icon, remove need for MSVCR71.dll
 
 
 #NoEnv
 #SingleInstance force
 #include _libGoogleEarthCOM.ahk
-version = 1.02
+version = 1.03
 title = Google Earth Hotkeys %version%
 
 SetTitleMatchMode RegEx
@@ -245,6 +246,7 @@ launchGE() {
 }
 
 launchKey(key) {
+	static 	; for the toggleF1, toggleF2 etc. variables to be remembered between calls
 	key := RegexReplace(key,"\+","s")
 	RegRead, action, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, %key%
 	If (action = "") {
@@ -262,17 +264,35 @@ launchKey(key) {
 	} else if (action = "Toggle Sidebar+Toolbar") {
 		Send ^!b^!t
 	} else {
-		Loop, parse, action, |
-		{
-			Layer = %A_LoopField%
-			If (SubStr(Layer,1,1) == "-") {
-				Layer := SubStr(Layer,2)
-				Hide(layer)
-			} Else If (SubStr(Layer,1,1) == "+") {
-				Layer := SubStr(Layer,2)
-				Show(layer)
-			} Else {
-				Show(layer)
+		If (SubStr(action,1,1) == "=") {	; toggling layers isn't perfect..not reading if the layer is visible beforehand - so may need to press twice to show it the first time
+			action := SubStr(action,2)
+			if (toggle%key%)
+				toggle%key% = 0
+			else
+				toggle%key% = 1
+			Loop, parse, action, |
+			{
+				Layer = %A_LoopField%
+				If (SubStr(Layer,1,1) == "-" or SubStr(Layer,1,1) == "+" or SubStr(Layer,1,1) == "=")
+					Layer := SubStr(Layer,2)
+				if (toggle%key%)
+					Show(layer)
+				else
+					Hide(layer)
+			}
+		} Else {
+			Loop, parse, action, |
+			{
+				Layer = %A_LoopField%
+				If (SubStr(Layer,1,1) == "-") {
+					Layer := SubStr(Layer,2)
+					Hide(layer)
+				} Else If (SubStr(Layer,1,1) == "+") {
+					Layer := SubStr(Layer,2)
+					Show(layer)
+				} Else {
+					Show(layer)
+				}
 			}
 		}
 	}
@@ -318,7 +338,7 @@ Default:
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, sF3
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, F4, Toggle Sidebar+Toolbar
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, sF4
-	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, F5, Temporary Places
+	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, F5, =Temporary Places
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, sF5, -Temporary Places|-My Places
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, F6, Borders and Labels|3D Buildings
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthHotkeys, sF6, -Borders and Labels|-3D Buildings
@@ -373,6 +393,7 @@ About:
   Gui 2:Add,Text,xm yp+22, A small program for configuring hotkeys for Google Earth.
   Gui 2:Add,Text,xm yp+16, When configuring hotkeys, start a layer name with a minus sign to hide it.
   Gui 2:Add,Text,xm yp+16, Separate multiple layers to show or hide with the pipe | character.
+  Gui 2:Add,Text,xm yp+16, Start the layer list with an equal sign = to toggle showing/hiding each layer.
   Gui 2:Add,Text,xm yp+16, Use the Win key + Shift + G global hotkey to launch Google Earth.
   Gui 2:Font
   Gui 2:Add,Text,xm yp+22, License: GPLv2+
