@@ -15,6 +15,7 @@
 ; 
 ; Needs _libGoogleEarth.ahk library:  http://david.tryse.net/googleearth/
 ; 
+; 1.12   -   click-window-to-drag
 ; 1.11   -   no code changes, fix icon, remove need for MSVCR71.dll
 ; 1.10   -   nothing new, up version number to release new executables of all tools without UPX compression (AV issues)
 ; 1.09   -   add new-version-check
@@ -28,7 +29,7 @@
 #SingleInstance off
 #NoTrayIcon 
 #include _libGoogleEarth.ahk
-version = 1.11
+version = 1.12
 
 ; -------- create right-click menu -------------
 Menu, context, add, Always On Top, OnTop
@@ -55,7 +56,12 @@ Gui, Add, Button, y325 x255 w100 , Copy_De&cimal
 WinPos := GetSavedWinPos("LatLongConversion")
 Gui, Show, %WinPos%, LatLong Conversion %version%
 Gui +LastFound
+OnMessage(0x201, "WM_LBUTTONDOWN")
 return
+
+WM_LBUTTONDOWN(wParam, lParam) {
+	PostMessage, 0xA1, 2		; move window
+}
 
 Button>>:
   Gui, Submit, NoHide
