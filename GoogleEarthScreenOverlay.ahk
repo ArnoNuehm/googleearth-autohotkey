@@ -8,13 +8,14 @@
 ; A small program for adding screen overlay images to Google Earth.
 ; 
 ; Version history:
+; 1.03   -   show image preview, show image anchor marker, copy KML to clipboard (shift-Save), open-new-win opens next to current, click-window-to-drag
 ; 1.02   -   add up-down arrows to the X/Y edit controls, +fix icon, remove need for MSVCR71.dll
 ; 1.01   -   Add DrawOrder option, make it possible to edit several overlays at once (use unique tmp file names, add menu option to open more copies of the program)
 
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
-version = 1.02
+version = 1.03
 
 RegRead OnTop, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthScreenOverlay, OnTop
 IfEqual, OnTop,
@@ -127,7 +128,7 @@ Gui Add, Button, xm+8  yp+26 w130 gSize20Width, 20`% of screen width
 Gui Add, Button, xm+8  yp+26 w130 gSize30Height, 30`% of screen height
 Gui, Add, Text, yp-36 xm+150, X:
 Gui, Add, Edit, yp-3 xp+20 w62 +right vSizeX gUpdateKML, %ImageX%
-Gui, Add, UpDown,  gArrowsControl vUpDownSizeX Range-9999-9999 0x80 Horz 16
+Gui, Add, UpDown,  gArrowsControl vUpDownSizeX Range-9999-9999 0x80 16
 Gui, Add, DropDownList, yp xp+70 w72 Choose1 gUpdateKML vSizeXunit, fraction|pixels
 Gui, Add, Text, yp+30 xm+150, Y:
 Gui, Add, Edit, yp-3 xp+20 w62 +right vSizeY gUpdateKML, %ImageY%
@@ -138,30 +139,38 @@ SizeY_TT := "Size of image along the Y (vertical) axis of the screen.  `nUse -1 
 SizeXunit_TT := "Unit for the horizontal size of the image.`nfraction : 0.1 is 10% of the screen width, 1 is the full width of the screen.  `npixels : specify horizontal size in pixels."
 SizeYunit_TT := "Unit for the vertical size of the image.  `nfraction : 0.1 is 10% of the screen height, 1 is the full height of the screen.`npixels : specify vertical size in pixels."
 ; ================================================================================
-; Gui, Font, bold
-Gui, Add, Text, yp+54 xm+5, Transparency:
+Gui, Add, Text, yp+56 xm+5, Transparency:
 Gui, Font, norm
-Gui, Add, ComboBox, yp-3 xp+106 w60 Choose1 gUpdateKML vTransparency, 0`%|10`%|20`%|40`%|60`%|80`%
-; Gui, Font, bold
-Gui, Add, Text, yp+3 xm+200, Rotate:
+Gui, Add, ComboBox, yp-3 xp+96 w70 Choose1 gUpdateKML vTransparency, 0`%|10`%|20`%|30`%|40`%|50`%|60`%|70`%|80`%|90`%|cf0f8fff
+; ================================================================================
+Gui, Add, Text, yp+30 xm+5, Rotation:
 Gui, Font, norm
-Gui, Add, ComboBox, yp-3 xp+54 w60 Choose1 gUpdateKML vRotate, 0|-45|-90|-135|45|90|135|180
-Transparency_TT := "Make the image semi-transparent in Google Earth."
+Gui, Add, ComboBox, yp-3 xp+96 w70 Choose1 gUpdateKML vRotate, 0|-5|-45|-90|-135|5|45|90|135|180
+Transparency_TT := "Make the image semi-transparent in Google Earth.`nYou can also enter 6 (or 8) digit color (or alpha+color) values in bbggrr format."
 Rotate_TT := "Rotate the image by a number of degrees."
 ; ================================================================================
-; Gui, Font, bold
 Gui, Add, Text, yp+30 xm+5, Draw Order:
 Gui, Font, norm
-Gui, Add, ComboBox, yp-3 xp+106 w60 Choose1 gUpdateKML vdrawOrder, 0|1|2|3|4|5|-1|-2|-3|-4|-5
-drawOrder_TT := "Images with a higher Draw Order are drawn on top of other images in case images overlap on the screen"
+Gui, Add, ComboBox, yp-3 xp+96 w70 Choose1 gUpdateKML vdrawOrder, 0|1|2|3|4|5|-1|-2|-3|-4|-5
+drawOrder_TT := "Images with a higher Draw Order are drawn on top of other images in case images overlap on the screen."
+; ================================================================================
+Gui, Add, GroupBox, yp-60 xm+180 w140 h82,
+Gui, Add, Picture, w130 h66 xm+185 yp+11 vImageView gAnchorDot,
+Gui, Font, cblack s14,Wingdings
+Gui, Add, Text, xm+200 yp bold BackgroundTrans Hidden vAnchorDot2, l
+Gui, Font, cred s12,Wingdings
+Gui, Add, Text, xm+201 yp bold BackgroundTrans Hidden vAnchorDot, l
+Gui, Font, norm s8, Verdana
+ImageView_TT := "The red dot is the ""anchor"" within the image, the point in the picture that will be located exactly at the screen position selected above."
 ; ================================================================================
 
 Gui, Font, bold
-Gui Add, Button, yp+34 xm+5 w160 h23 vKMLOpen gKMLOpen, &Show in Google Earth
+Gui Add, Button, yp+80 xm+5 w167 h23 vKMLOpen gKMLOpen, &Show in Google Earth
 Gui, Font, norm
-Gui Add, Button, yp xm+175 w80 h23 gKMLSave, S&ave File
+Gui Add, Button, yp xm+179 w80 h23 vKMLSave gKMLSave, S&ave File
 Gui, Add, Button, yp xm+271 w50 vAbout gAbout, &?
 KMLOpen_TT := "Show the Screen Overlay image in Google Earth.`nIt will be automatically updated with any changes you make here."
+KMLSave_TT := "Save the KML file to disk.`nHold down shift instead to copy the KML code to the clipboard."
 
 Gui, Add, Button, ym xm greload hidden, reloa&d
 WinPos := GetSavedWinPos("GoogleEarthScreenOverlay")
@@ -170,9 +179,14 @@ Gui +LastFound
 If OnTop
 	WinSet AlwaysOnTop
 OnMessage(0x200, "WM_MOUSEMOVE")
+OnMessage(0x201, "WM_LBUTTONDOWN")
 SetFormat Float, 0.2
 SetTimer, UpdateKMLGO, 400
 return
+
+WM_LBUTTONDOWN(wParam, lParam) {
+	PostMessage, 0xA1, 2		; move window
+}
 
 ; http://www.autohotkey.com/forum/topic13109.html
 ArrowsControl:
@@ -293,20 +307,30 @@ SetSizeXY(x,y) {
 ; ================================================================================
 
 UpdateKML:
-needupdate = 2
+  Gosub AnchorDot
+  needupdate = 2
 return
 
 UpdateKMLGO:
 If (!needupdate)
 	return
 Gui Submit, NoHide
-StringReplace, Transparency, Transparency, `%
-Transparency := Round(Transparency/100*255)
-SetFormat, IntegerFast, hex
-Opacity := 0xff-Transparency
-StringReplace, Opacity, Opacity, 0x
-SetFormat, IntegerFast, d
-SplitPath, ImageFile,, Dir,, Name
+if (strLen(Transparency) == 8) {
+	color := Transparency
+} else if (strLen(Transparency) == 6) {
+	color := "ff" Transparency
+; } else if (strLen(Transparency) == 2) {
+	; color := Transparency "ffffff"
+} else {
+	StringReplace, Transparency, Transparency, `%
+	Transparency := Round(Transparency/100*255)
+	SetFormat, IntegerFast, hex
+	Opacity := 0xff-Transparency
+	StringReplace, Opacity, Opacity, 0x
+	SetFormat, IntegerFast, d
+	color := Opacity "ffffff"
+}
+SplitPath, ImageFile, FileName, Dir,, Name
 KML =
 (
 <?xml version="1.0" encoding="UTF-8"?>
@@ -314,7 +338,7 @@ KML =
 <Document>
 	<ScreenOverlay>
 	  <name>%Name%</name>
-	  <color>%Opacity%ffffff</color>
+	  <color>%color%</color>
 	  <Icon>
 		<href>%ImageFile%</href>
 	  </Icon>
@@ -349,13 +373,71 @@ OpenFile:
   GuiControl,, ImageFile, %SelectedFile%
   SplitPath, SelectedFile,, Dir,, Name
   Gosub UpdateKML
+  Gosub ImageView
+return
+
+ImageView:
+  GuiControlGet, ImageFile,, ImageFile
+  GuiControl,, ImageView, *w-1 *h66 %ImageFile%
+  ControlGetPos,,, width, height, Static10
+  if (width > 130) 					; scale very wide photos on width instead of height, to avoid flowing outside the control..
+	GuiControl,, ImageView, *w130 *h-1 %ImageFile%
+  Gosub AnchorDot
+return
+
+AnchorDot:
+  GuiControlGet, ix,, ImageX
+  GuiControlGet, iy,, ImageY
+  GuiControlGet, ixu,, ImageXunit
+  GuiControlGet, iyu,, ImageYunit
+  GuiControl, Hide, AnchorDot
+  GuiControl, Hide, AnchorDot2
+  ControlGetPos, xpos, ypos, width, height, Static10
+  if (ixu = "pixels")
+	ix = 0
+  else if (ixu = "insetPixels")
+	ix = 1
+  if (iyu = "pixels")
+	iy = 0
+  else if (iyu = "insetPixels")
+	iy = 1
+  if (ix < 0)
+	ix = 0
+  else if (ix > 1)
+	ix = 1
+  if (iy < 0)
+	iy = 0
+  else if (iy > 1)
+	iy = 1
+  newx := xpos + (width-12) * ix - 3
+  newy := ypos + (height-11) * (1-iy) - 28
+  newx2 := newx - 1
+  newy2 := newy - 2
+  GuiControl, Move, AnchorDot, x%newx% y%newy%
+  GuiControl, Move, AnchorDot2, x%newx2% y%newy2%
+  If (SelectedFile) {
+	GuiControl, Show, AnchorDot
+	GuiControl, Show, AnchorDot2
+  }
 return
 
 KMLSave:
-  FileSelectFile, SelectedFile, S 16, , Save as KML file..., KML files (*.kml)
-  IfEqual SelectedFile,, return
-  Gosub UpdateKML
-  FileCopy, %KMLfile%, %SelectedFile%, 1
+  GetKeyState, altstate, Alt
+  GetKeyState, shiftstate, Shift
+  If (altstate = "D") {
+	If (ScreenXunit == "fraction" and ScreenYunit == "fraction" and SizeXunit == "fraction" and SizeYunit == "fraction" and ImageXunit == "fraction" and ImageYunit == "fraction")
+		clipboard := "addOverlay(""" Name """, ""files/" FileName """, " ScreenX ", " ScreenY ", " SizeX ", " SizeY ", " ImageX ", " ImageY ", """ Opacity """, " drawOrder ", " Rotate ");`n"
+	Else
+		clipboard := "addOverlayUnit(""" Name """, ""files/" FileName """, " ScreenX ", " ScreenY ", """ ScreenXunit """, """ ScreenYunit """, " SizeX ", " SizeY ", """ SizeXunit """, """ SizeYunit """, " ImageX ", " ImageY ", """ ImageXunit """, """ ImageYunit """, """ Opacity """, " drawOrder ", " Rotate ");`n"
+  } Else If (shiftstate = "D") {
+	Gosub UpdateKML
+	clipboard := KML
+  } Else {
+	FileSelectFile, SelectedFile, S 16, , Save as KML file..., KML files (*.kml)
+	IfEqual SelectedFile,, return
+	Gosub UpdateKML
+	FileCopy, %KMLfile%, %SelectedFile%, 1
+	}
 return
 
 KMLOpen:
@@ -418,6 +500,7 @@ CoordFromKML(kmlcoordfile) {
 		GuiControl, ChooseString, SizeYunit, %SizeYunit1%
 		GuiControl,, Rotate, %Rotate1%
 		GuiControl, ChooseString, Rotate, %Rotate1%
+		Gosub ImageView
 	} else {
 		Msgbox,48, No ScreenOverlay parameters found!, Error: Cannot find ScreenOverlay parameters in %kmlcoordfile%.
 	}
@@ -461,7 +544,8 @@ reload:
 return
 
 AddWindow:
-Run, %A_ScriptFullPath%
+  SaveWinPos("GoogleEarthScreenOverlay", 1)
+  Run, %A_ScriptFullPath%
 return
 
 OnTop:
@@ -476,8 +560,12 @@ GuiContextMenu:
 return
 
 GuiClose:
-  SaveWinPos("GoogleEarthScreenOverlay")
+  SaveWinPos("GoogleEarthScreenOverlay", 0)
 ExitApp
+
+GuiEscape:
+	WinMinimize
+return
 
 About:
   Gui 2:Destroy
@@ -529,8 +617,10 @@ AboutOk:
   Gui 2:Destroy
 return
 
-SaveWinPos(HKCUswRegkey) {	; add SaveWinPos("my_program") in "GuiClose:" routine
-  WinGetPos, X, Y, , , A  ; "A" to get the active window's pos.
+SaveWinPos(HKCUswRegkey, addone) {	; add SaveWinPos("my_program") in "GuiClose:" routine
+  WinGetPos, X, Y, W, , A  ; "A" to get the active window's pos.
+  if (addone)
+	X := X+W	; add one window width, to open new win next to this one
   RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\%HKCUswRegkey%, WindowX, %X%
   RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\%HKCUswRegkey%, WindowY, %Y%
 }
