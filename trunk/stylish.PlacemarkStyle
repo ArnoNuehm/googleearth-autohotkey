@@ -20,9 +20,9 @@
 			<scale>0.7</scale>
 		</LabelStyle>
 		<BalloonStyle>
-			<bgColor>88292626</bgColor>
+			<bgColor>ff292626</bgColor>
 			<text><![CDATA[
-<center>
+<div style='background-color: #262629; text-align:center; margin: 0'>
 <font color="#777777">$[FileName]</font><br><br>
 <table bgcolor="#000000" border="1" cellspacing="0" cellpadding="12">
 	<tr>
@@ -41,10 +41,10 @@
 	<a href="#$[prev];balloonFlyto"><img width="73" height="30" src="http://david.tryse.net/prev.png"></a>
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 	<a href="#$[next];balloonFlyto"><img width="73" height="30" src="http://david.tryse.net/next.png"></a>
-	<br>
-	<a href='http://code.google.com/p/googleearth-autohotkey/'><font color='#606060'>This kml was made with Google Earth PhotoTag</font></a>
+	<br><br>
+	<a href='http://code.google.com/p/googleearth-autohotkey/'><font size='-1' color='#606060'>This kml was made with Google Earth PhotoTag</font></a>
 </div>
-</center>
+</div>
 			]]></text>
 		</BalloonStyle>
 	</Style>
@@ -60,9 +60,9 @@
 			<scale>0.7</scale>
 		</LabelStyle>
 		<BalloonStyle>
-			<bgColor>88292626</bgColor>
+			<bgColor>ff292626</bgColor>
 			<text><![CDATA[
-<center>
+<div style='background-color: #262629; text-align:center; margin: 0'>
 <font color="#777777">$[FileName]</font><br><br>
 <table bgcolor="#000000" border="1" cellspacing="0" cellpadding="12">
 	<tr>
@@ -81,10 +81,10 @@
 	<a href="#$[prev];balloonFlyto"><img width="73" height="30" src="http://david.tryse.net/prev.png"></a>
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 	<a href="#$[next];balloonFlyto"><img width="73" height="30" src="http://david.tryse.net/next.png"></a>
-	<br>
-	<a href='http://code.google.com/p/googleearth-autohotkey/'><font color='#606060'>This kml was made with Google Earth PhotoTag</font></a>
+	<br><br>
+	<a href='http://code.google.com/p/googleearth-autohotkey/'><font size='-1' color='#606060'>This kml was made with Google Earth PhotoTag</font></a>
 </div>
-</center>
+</div>
 			]]></text>
 		</BalloonStyle>
 	</Style>
