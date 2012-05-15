@@ -1,4 +1,4 @@
-; _libGoogleEarth.ahk  version 1.23
+; _libGoogleEarth.ahk  version 1.25
 ; by David Tryse   davidtryse@gmail.com
 ; http://david.tryse.net/googleearth/
 ; http://code.google.com/p/googleearth-autohotkey/
@@ -12,11 +12,11 @@
 ; 
 ; Needs ws4ahk.ahk library:  http://www.autohotkey.net/~easycom/ (only in _libGoogleEarthCOM.ahk)
 ; Functions for Exif GPS data needs exiv2.exe:  http://www.exiv2.org/
-; Functions for Exif GPS data will optionally use cmdret.dll if present (to avoid temp files for command output):  http://www.autohotkey.com/forum/topic3687.html
 ; 
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ ) (only in _libGoogleEarthCOM.ahk)
 ;
 ; Version history:
+; 1.25   -   fix descript.ion functions to handle filenames with () brackets, swap cmdret.dll for builtin function to capture command output, some coord conversion fixes
 ; 1.24   -   fix IsGErunning()
 ; 1.23   -   fix IsGErunning() and ImageDim()
 ; 1.22   -   split into _libGoogleEarth.ahk and _libGoogleEarthCOM.ahk (avoid loading Windows Scripting env and COM API functions in LatLongConversion/GoogleEarthTiler)
@@ -48,6 +48,7 @@
 Deg2Dec(DegCoord, mode = "both") {
 	StringReplace DegCoord,DegCoord,and,%A_Space%,All	; replace all possible separators with space before StringSplit
 	StringReplace DegCoord,DegCoord,`,,%A_Space%,All
+	StringReplace DegCoord,DegCoord,’,,%A_Space%,All
 	StringReplace DegCoord,DegCoord,degrees,%A_Space%,All
 	StringReplace DegCoord,DegCoord,degree,%A_Space%,All
 	StringReplace DegCoord,DegCoord,degs,%A_Space%,All
@@ -68,13 +69,16 @@ Deg2Dec(DegCoord, mode = "both") {
 	StringReplace DegCoord,DegCoord,sec,%A_Space%,All
 	StringReplace DegCoord,DegCoord,`",%A_Space%,All
 	StringReplace DegCoord,DegCoord,:,%A_Space%,All
+	StringReplace DegCoord,DegCoord,(,%A_Space%,All
+	StringReplace DegCoord,DegCoord,),%A_Space%,All
+	StringReplace DegCoord,DegCoord,South,S
+	StringReplace DegCoord,DegCoord,North,N
+	StringReplace DegCoord,DegCoord,East,E
+	StringReplace DegCoord,DegCoord,West,W
 	StringReplace DegCoord,DegCoord,S,%A_Space%S		; add space before south/west/north/east to separate as a new word
 	StringReplace DegCoord,DegCoord,N,%A_Space%N
 	StringReplace DegCoord,DegCoord,E,%A_Space%E
 	StringReplace DegCoord,DegCoord,W,%A_Space%W
-	StringReplace DegCoord,DegCoord,Ea st,East		; fix when previous S/South and E/East replace break up west/east words...
-	StringReplace DegCoord,DegCoord,W e st,West
-	StringReplace DegCoord,DegCoord,W est,West
 	StringReplace DegCoord,DegCoord,%A_Tab%,%A_Space%,All
 	Loop {  		 	; loop to replace all double spaces (otherwise StringSplit wont work properly)
 		StringReplace DegCoord,DegCoord,%A_Space%%A_Space%,%A_Space%,All UseErrorLevel
@@ -87,21 +91,21 @@ Deg2Dec(DegCoord, mode = "both") {
 	{
 		if (A_Index = 1)
 			LatD := A_LoopField
-		else if (A_Index = 2) and (A_LoopField = "S" or A_LoopField = "South")	; format is Deg
+		else if (A_Index = 2) and (A_LoopField = "S")	; format is Deg
 			Lat := LatD * -1
-		else if (A_Index = 2) and (A_LoopField = "N" or A_LoopField = "North")	; format is Deg
+		else if (A_Index = 2) and (A_LoopField = "N")	; format is Deg
 			Lat := LatD * 1
 		else if (A_Index = 2)
 			LatM := A_LoopField
-		else if (A_Index = 3) and (A_LoopField = "S" or A_LoopField = "South")	; format is Deg Min
+		else if (A_Index = 3) and (A_LoopField = "S")	; format is Deg Min
 			Lat := (LatD + LatM/60) * -1
-		else if (A_Index = 3) and (A_LoopField = "N" or A_LoopField = "North")	; format is Deg Min
+		else if (A_Index = 3) and (A_LoopField = "N")	; format is Deg Min
 			Lat := (LatD + LatM/60) * 1
 		else if (A_Index = 3)
 			LatS := A_LoopField
-		else if (A_Index = 4) and (A_LoopField = "S" or A_LoopField = "South")	; format is Deg Min Sec
+		else if (A_Index = 4) and (A_LoopField = "S")	; format is Deg Min Sec
 			Lat := (LatD + LatM/60 + LatS/60/60) * -1
-		else if (A_Index = 4) and (A_LoopField = "N" or A_LoopField = "North")	; format is Deg Min Sec
+		else if (A_Index = 4) and (A_LoopField = "N")	; format is Deg Min Sec
 			Lat := (LatD + LatM/60 + LatS/60/60) * 1
 		if (A_Index = 4 and not Lat)
 			return "error"
@@ -115,21 +119,21 @@ Deg2Dec(DegCoord, mode = "both") {
 	{
 		if (A_Index = LatEnd+1)
 			LongD := A_LoopField
-		else if (A_Index = LatEnd+2) and (A_LoopField = "W" or A_LoopField = "West")	; format is Deg
+		else if (A_Index = LatEnd+2) and (A_LoopField = "W")	; format is Deg
 			Long := LongD * -1
-		else if (A_Index = LatEnd+2) and (A_LoopField = "E" or A_LoopField = "East")	; format is Deg
+		else if (A_Index = LatEnd+2) and (A_LoopField = "E")	; format is Deg
 			Long := LongD * 1
 		else if (A_Index = LatEnd+2)
 			LongM := A_LoopField
-		else if (A_Index = LatEnd+3) and (A_LoopField = "W" or A_LoopField = "West")	; format is Deg Min
+		else if (A_Index = LatEnd+3) and (A_LoopField = "W")	; format is Deg Min
 			Long := (LongD + LongM/60) * -1
-		else if (A_Index = LatEnd+3) and (A_LoopField = "E" or A_LoopField = "East")	; format is Deg Min
+		else if (A_Index = LatEnd+3) and (A_LoopField = "E")	; format is Deg Min
 			Long := (LongD + LongM/60) * 1
 		else if (A_Index = LatEnd+3)
 			LongS := A_LoopField
-		else if (A_Index = LatEnd+4) and (A_LoopField = "W" or A_LoopField = "West")	; format is Deg Min Sec
+		else if (A_Index = LatEnd+4) and (A_LoopField = "W")	; format is Deg Min Sec
 			Long := (LongD + LongM/60 + LongS/60/60) * -1
-		else if (A_Index = LatEnd+4) and (A_LoopField = "E" or A_LoopField = "East")	; format is Deg Min Sec
+		else if (A_Index = LatEnd+4) and (A_LoopField = "E")	; format is Deg Min Sec
 			Long := (LongD + LongM/60 + LongS/60/60) * 1
 		if (A_Index = LatEnd+4 and not Long)
 			return "error"
@@ -243,7 +247,7 @@ GetPhotoLatLongAlt(fullfilename, byref FocusPointLatitude, byref FocusPointLongi
 		FocusPointLongitude	:= Deg2Dec(Pos,"long")
 	} else {
 		CMD := """" toolpath """ -u -Pkt """ fullfilename """"
-		captureOutput(CMD, StrOut)
+		StrOut := captureOutput(CMD)
 		Loop, parse, StrOut, `n`r
 		{
 			If (SubStr(A_LoopField, 1, 28) = "Exif.GPSInfo.GPSLatitudeRef ") {
@@ -306,8 +310,7 @@ SetPhotoLatLongAlt(fullfilename, FocusPointLatitude, FocusPointLongitude, FocusP
 		CMD := """" toolpath """ -M""set Exif.GPSInfo.GPSVersionID 2 2 0 0"" -M""set Exif.GPSInfo.GPSLatitude " LatRel """ -M""set Exif.GPSInfo.GPSLatitudeRef " LatRef """ -M""set Exif.GPSInfo.GPSLongitude " LongRel """ -M""set Exif.GPSInfo.GPSLongitudeRef " LongRef """ -M""del Exif.GPSInfo.GPSAltitudeRef"" -M""del Exif.GPSInfo.GPSAltitude"" """ fullfilename """"
 	Else
 		CMD := """" toolpath """ -M""set Exif.GPSInfo.GPSVersionID 2 2 0 0"" -M""set Exif.GPSInfo.GPSLatitude " LatRel """ -M""set Exif.GPSInfo.GPSLatitudeRef " LatRef """ -M""set Exif.GPSInfo.GPSLongitude " LongRel """ -M""set Exif.GPSInfo.GPSLongitudeRef " LongRef """ -M""set Exif.GPSInfo.GPSAltitude " AltRel """ -M""set Exif.GPSInfo.GPSAltitudeRef 0"" """ fullfilename """"
-	If captureOutput(CMD, StrOut) != 1
-		return 1
+	StrOut := captureOutput(CMD)
 		;Msgbox, 48, Error, %StrOut%`n`nCommand line:`n`n%CMD%
 }
 
@@ -317,8 +320,7 @@ ErasePhotoLatLong(fullfilename, toolpath = "exiv2.exe") {
 		return 2
 	SplitPath fullfilename, filename, dir
 	CMD := """" toolpath """ -M""del Exif.GPSInfo.GPSVersionID"" -M""del Exif.GPSInfo.GPSLatitude"" -M""del Exif.GPSInfo.GPSLatitudeRef"" -M""del Exif.GPSInfo.GPSLongitude"" -M""del Exif.GPSInfo.GPSLongitudeRef"" -M""del Exif.GPSInfo.GPSAltitudeRef"" -M""del Exif.GPSInfo.GPSAltitude"" -M""del Exif.GPSInfo.GPSTrack"" """ fullfilename """"
-	If captureOutput(CMD, StrOut) != 1
-		return 1
+	StrOut := captureOutput(CMD)
 }
 
 ; ================================================================== OTHER JPEG EXIF/XMP etc. FUNCTIONS ==================================================================
@@ -329,7 +331,7 @@ GetExif(fullfilename, byref StrOut, toolpath = "exiv2.exe") {
 		return 2
 	SplitPath fullfilename, filename, dir
 	CMD := """" toolpath """ -Pkt """ fullfilename """"
-	captureOutput(CMD, StrOut)
+	StrOut := captureOutput(CMD)
 }
 
 ;call with GetJPEGComment(fullfilename, JPEGCommentOutputVar)
@@ -338,7 +340,7 @@ GetJPEGComment(fullfilename, byref StrOut, toolpath = "exiv2.exe") {
 		return 2
 	SplitPath fullfilename, filename, dir
 	CMD := """" toolpath """ -pc """ fullfilename """"
-	captureOutput(CMD, StrOut)
+	StrOut := captureOutput(CMD)
 	StrOut := RegExReplace(StrOut, "\r\n$", "") ; strip newline at the end
 }
 
@@ -350,13 +352,13 @@ SetJPEGComment(fullfilename, newComment, toolpath = "exiv2.exe") {
 	IfEqual, newComment,
 	{
 		CMD := """" toolpath """ -dc """ fullfilename """"	; delete comment
-		captureOutput(CMD, StrOut)
+		StrOut := captureOutput(CMD)
 		IfNotEqual, StrOut,
 			return 1
 	}
 	StringReplace, newComment, newComment, `", \`", All		; add \ before any double quotes
 	CMD := """" toolpath """ -c """ newComment """ """ fullfilename """"
-	captureOutput(CMD, StrOut)
+	StrOut := captureOutput(CMD)
 	IfNotEqual, StrOut,
 		return 1
 }
@@ -372,7 +374,7 @@ SetXmpTag(fullfilename, tagname, tagdata, toolpath = "exiv2.exe") {
 		CMD := """" toolpath """ -M""del Xmp.xmp." tagname """ """ fullfilename """"	; delete tag
 	Else
 		CMD := """" toolpath """ -M""set Xmp.xmp." tagname " " tagdata """ """ fullfilename """"
-	captureOutput(CMD, StrOut)
+	StrOut := captureOutput(CMD)
 	IfNotEqual, StrOut,
 		return 1
 }
@@ -384,7 +386,7 @@ GetXmpTag(fullfilename, tagname, byref XMPtagOutputVar, toolpath = "exiv2.exe") 
 	SplitPath fullfilename, filename, dir
 	StringReplace, tagname, tagname, `", \`", All		; add \ before any double quotes
 	CMD := """" toolpath """ -px """ fullfilename """"
-	captureOutput(CMD, StrOut)
+	StrOut := captureOutput(CMD)
 	XMPtagOutputVar =
 	Loop, parse, StrOut, `n`r
 	{
@@ -403,7 +405,7 @@ ImageDim(fullfilename, byref ImgWidth, byref ImgHeight, ImageMagickTool = "", sk
 		ImageMagickTool := findFile("identify.exe")
 	If (ImageMagickTool) {
 		CMD := """" ImageMagickTool """ -quiet -ping -format ""%wx%hx"" """ fullfilename """" ; shows 640x480x - 2nd x to avoid including linefeed when splitting string below
-		captureOutput(CMD, StrOut)
+		StrOut := captureOutput(CMD)
 		If (SubStr(StrOut, 1, 12) == "identify.exe") {
 			return 3
 		} else {
@@ -431,6 +433,7 @@ ImageDim(fullfilename, byref ImgWidth, byref ImgHeight, ImageMagickTool = "", sk
 FileDescription(FileFullname) {
   SplitPath, FileFullname, Name, Dir
   FileRead, DescriptIon, %Dir%\descript.ion
+  Name := RegExReplace(RegExReplace(Name, "\(", "\("), "\)", "\)")
   If RegExMatch(DescriptIon, "m)^""?" Name """?[ \t]*(.*)", Descr)	; find line with file description (w/wo quotes around filename)
 	return Descr1
 }
@@ -456,7 +459,8 @@ WriteFileDescription(FileFullname, newDescription) {
   } else {		; description exists - replace
 	ThisDescriptIon := """" Name """" " " newDescription
 	FileRead, DescriptIon, %DescriptIonFile%
-	DescriptIon := RegExReplace(DescriptIon, "m)^""?" Name """?[ \t]*(.*)", ThisDescriptIon, ReplacementsDone)	; replace line with current description (w/wo quotes on filename)
+	Name2 := RegExReplace(RegExReplace(Name, "\(", "\("), "\)", "\)")
+	DescriptIon := RegExReplace(DescriptIon, "m)^""?" Name2 """?[ \t]*(.*)", ThisDescriptIon, ReplacementsDone)	; replace line with current description (w/wo quotes on filename)
 	if (ReplacementsDone = 0)
 		DescriptIon := DescriptIon "`r`n" ThisDescriptIon "`r`n"		; if no description currently add line at the end
 	StringReplace, DescriptIon, DescriptIon, `r`n`r`n, `r`n, All 		; drop double linefeeds
@@ -467,28 +471,57 @@ WriteFileDescription(FileFullname, newDescription) {
 
 ; ================================================================== INTERNAL FUNCTIONS ==================================================================
 
-; function is used internally - run command and return output - call with captureOutput(commandline, outputvar)
-captureOutput(CMD, byref StrOut) {
-	;FileAppend, %CMD%`n, %A_Temp%\ahk_libGoogleEarth.log	; debug XXXXXXXXXXX
-	cmdretDllPath := findFile("cmdret.dll")
-	IfEqual cmdretDllPath
-	{
-		Random, rand, 11111111, 99999999
-		; RunWait, %CMD% > %A_Temp%\_libGE_%rand%.tmp,, Hide
-		; RunWait, cmd.exe /c start /b "" %CMD% > %A_Temp%\_libGE_%rand%.tmp,, Hide
-		StringReplace, CMD, CMD, `%, `%`%, All
-		FileAppend, %CMD% > %A_Temp%\_libGE_%rand%.tmp, %A_Temp%\_libGE_%rand%_tmp.bat
-		RunWait, cmd /c %A_Temp%\_libGE_%rand%_tmp.bat,, Hide
-		FileDelete, %A_Temp%\_libGE_%rand%_tmp.bat
-		FileRead, StrOut, %A_Temp%\_libGE_%rand%.tmp
-		FileGetSize, ret, %A_Temp%\_libGE_%rand%.tmp
-		FileDelete, %A_Temp%\_libGE_%rand%.tmp
-		return ret
-	} else {
-		VarSetCapacity(StrOut, 32000)
-		return DllCall(cmdretDllPath "\RunReturn", "str", CMD, "str", StrOut)
+; http://www.autohotkey.com/forum/viewtopic.php?t=16823	StdoutToVar_CreateProcess by Sean
+; simplified to remove streaming/input-strings
+captureOutput(sCmd, sDir = "") {
+	DllCall("CreatePipe", "UintP", hStdOutRd, "UintP", hStdOutWr, "Uint", 0, "Uint", 0)
+	DllCall("SetHandleInformation", "Uint", hStdOutWr, "Uint", 1, "Uint", 1)
+	VarSetCapacity(pi, 16, 0)
+	NumPut(VarSetCapacity(si, 68, 0), si)	; size of si
+	NumPut(0x100	, si, 44)		; STARTF_USESTDHANDLES
+	NumPut(hStdOutWr, si, 60)		; hStdOutput
+	NumPut(hStdOutWr, si, 64)		; hStdError
+	If Not DllCall("CreateProcess", "Uint", 0, "Uint", &sCmd, "Uint", 0, "Uint", 0, "int", True, "Uint", 0x08000000, "Uint", 0, "Uint", sDir ? &sDir : 0, "Uint", &si, "Uint", &pi)	; bInheritHandles and CREATE_NO_WINDOW
+		return -1
+	DllCall("CloseHandle", "Uint", NumGet(pi,0))
+	DllCall("CloseHandle", "Uint", NumGet(pi,4))
+	DllCall("CloseHandle", "Uint", hStdOutWr)
+	VarSetCapacity(sTemp, nTemp:=4095)
+	Loop {
+		If	DllCall("ReadFile", "Uint", hStdOutRd, "Uint", &sTemp, "Uint", nTemp, "UintP", nSize:=0, "Uint", 0)&&nSize
+		{
+			NumPut(0,sTemp,nSize,"Uchar"), VarSetCapacity(sTemp,-1), sOutput.=sTemp
+		}
+		Else
+			Break
 	}
+	DllCall("CloseHandle", "Uint", hStdOutRd)
+	Return	sOutput
 }
+
+;captureOutput1(CMD) {
+;	cmdretDllPath := findFile("cmdret.dll")
+;	IfEqual cmdretDllPath
+;		return captureOutput2(CMD)
+;	else {
+;		VarSetCapacity(StrOut, 32000)
+;		DllCall(cmdretDllPath "\RunReturn", "str", CMD, "str", StrOut)
+;		return StrOut
+;	}
+;}
+
+;captureOutput2(CMD) {
+;	Random, rand, 11111111, 99999999
+;	StringReplace, CMD, CMD, `%, `%`%, All
+;	FileAppend, %CMD% > %A_Temp%\_output_%rand%.tmp, %A_Temp%\_output_%rand%_tmp.bat
+;	RunWait, cmd /c %A_Temp%\_output_%rand%_tmp.bat,, Hide
+;	FileDelete, %A_Temp%\_output_%rand%_tmp.bat
+;	FileRead, StrOut, %A_Temp%\_output_%rand%.tmp
+;	; FileGetSize, size, %A_Temp%\_output_%rand%.tmp
+;	FileDelete, %A_Temp%\_output_%rand%.tmp
+;	return StrOut
+;}
+
 
 ; find cmdret.dll - function is used internally for deciding if to use cmdret.dll or "Run,,,hide" to get exiv2.exe command output
 ; %temp% is included in the search path to be able to use "FileInstall cmdret.dll, %A_Temp%\cmdret.dll" in compiled scripts
