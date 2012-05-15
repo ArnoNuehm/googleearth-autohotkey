@@ -11,6 +11,7 @@
 ; Needs convert.exe and idenfity.exe from ImageMagick:  http://www.imagemagick.org/
 ; 
 ; Version history:
+; 1.08   -   click-window-to-drag
 ; 1.07   -   fix open-in-google-earth button
 ; 1.06   -   no code changes, fix icon, remove need for MSVCR71.dll
 ; 1.05   -   add partial support for GeoTiff files using bundled listgeo.exe (only reads top-left and bottom-right corner coordinates to get north/south/east/west - not perfect for files with rotated/skewed fit)
@@ -22,8 +23,9 @@
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
+#Include %A_ScriptDir%
 #include _libGoogleEarth.ahk
-version = 1.07
+version = 1.08
 FileInstall cmdret.dll, %A_Temp%\cmdret.dll, 1	; bundle cmdret.dll in executable (avoids temp files when capturing cmdline output)
 FileInstall listgeo.exe, %A_Temp%\listgeo.exe, 1	; to get corner coordinates from GeoTiff files
 ListGeo := A_Temp "\listgeo.exe"
@@ -159,7 +161,12 @@ WinPos := GetSavedWinPos("GoogleEarthTiler")
 Gui, Show, %WinPos%, Google Earth Tiler %version%
 Gui +LastFound
 OnMessage(0x200, "WM_MOUSEMOVE")
+OnMessage(0x201, "WM_LBUTTONDOWN")
 return
+
+WM_LBUTTONDOWN(wParam, lParam) {
+	PostMessage, 0xA1, 2		; move window
+}
 
 Make:
   Gui, Submit, NoHide
@@ -483,15 +490,27 @@ CoordFromKML(kmlcoordfile) {
 
 CoordFromTif(imagefile, ListGeo) {
 	CMD := """" ListGeo """ """ imagefile """"
-	captureOutput(CMD, StrOut)
-	RegExMatch(StrOut, "Upper\s*Left\s*\([0-9\s\,\.]*\)\s*\((.*),(.*)\)", geotifTL)
-	RegExMatch(StrOut, "Lower\s*Right\s*\([0-9\s\,\.]*\)\s*\((.*),(.*)\)", geotifLR)
+	StrOut := captureOutput(CMD)
+	RegExMatch(StrOut, "Upper\s*Left\s*\([-0-9\s\,\.]*\)\s*\((.*),(.*)\)", geotifTL)
+	RegExMatch(StrOut, "Lower\s*Right\s*\([-0-9\s\,\.]*\)\s*\((.*),(.*)\)", geotifLR)
+	RegExMatch(StrOut, "Lower\s*Left\s*\([-0-9\s\,\.]*\)\s*\((.*),(.*)\)", geotifLL)
+	RegExMatch(StrOut, "Upper\s*Right\s*\([-0-9\s\,\.]*\)\s*\((.*),(.*)\)", geotifTR)
 	tifnorth1 := Deg2Dec(geotifTL2 "," geotifTL1, "lat")
-	tifwest1 := Deg2Dec(geotifTL2 "," geotifTL1, "long")
+	tifwest1  := Deg2Dec(geotifTL2 "," geotifTL1, "long")
 	tifsouth1 := Deg2Dec(geotifLR2 "," geotifLR1, "lat")
-	tifeast1 := Deg2Dec(geotifLR2 "," geotifLR1, "long")
+	tifeast1  := Deg2Dec(geotifLR2 "," geotifLR1, "long")
+	; tifnorth2 := Deg2Dec(geotifTR2 "," geotifTR1, "lat")
+	; tifwest2  := Deg2Dec(geotifLL2 "," geotifLL1, "long")
+	; tifsouth2 := Deg2Dec(geotifLL2 "," geotifLL1, "lat")
+	; tifeast2  := Deg2Dec(geotifTR2 "," geotifTR1, "long")
+	; msgbox % StrOut
 	If (tifnorth1 != "" and tifsouth1 != "" and tifwest1 != "" and tifeast1 != "") {
 		MsgBox, 4, Load coordinates from GeoTiff file?, GoogleEarthTiler can read the north/south/east/west coordinates from the top-left and bottom-right corner coordinates stored inside this GeoTiff file.`n(top-right and bottom-left coordinates are ignored and files with a rotated or skewed fit may not line up 100`% correctly)`n`nLoad coordinates from this GeoTiff file?
+		; msgbox % tifnorth1 " = " tifnorth2 "`n" tifsouth1 " = " tifsouth2 "`n" tifwest1 " = " tifwest2 "`n" tifeast1 " = " tifeast2
+		; If (tifnorth1 == tifnorth2 and tifsouth1 == tifsouth2 and tifwest1 == tifwest2 and tifeast1 == tifeast2)	; perfect match
+			; MsgBox, 4, Load coordinates from GeoTiff file?, GoogleEarthTiler can read the north/south/east/west coordinates from the coordinates stored inside this GeoTiff file.`n`nLoad coordinates from this GeoTiff file?
+		; Else
+			; MsgBox, 4, Load coordinates from GeoTiff file?, GoogleEarthTiler can read the north/south/east/west coordinates from the top-left and bottom-right corner coordinates stored inside this GeoTiff file.`n`nWarning: The top-right and bottom-left coordinates will be ignored.`n(this file appears to be rotated and may not line up 100`% correctly)`n`nLoad coordinates from this GeoTiff file?
 		IfMsgBox Yes
 		{
 			GuiControl,, LongitudeNorth, %tifnorth1%
