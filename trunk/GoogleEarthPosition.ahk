@@ -16,6 +16,7 @@
 ; The script uses the Google Earth COM API  ( http://earth.google.com/comapi/ )
 ;
 ; Version history:
+; 1.17   -   better status bar messages, alt-1-6 hotkeys, click-window-to-drag
 ; 1.16   -   no code changes, fix icon, remove need for MSVCR71.dll
 ; 1.15   -   add copy <gx:FlyTo> option, copy DMS coord option
 ; 1.14   -   add new-version-check
@@ -35,8 +36,9 @@
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
+#Include %A_ScriptDir%
 #include _libGoogleEarthCOM.ahk
-version = 1.16
+version = 1.17
 
 IfEqual, 1, /start
 {
@@ -107,18 +109,18 @@ Gui, Add, Button, x10 w120 gCopy_LatLong_KML vCopy_LatLong_KML, Copy LatLong K&M
 Gui, Add, Button, yp x140 w120 gCopy_LookAt_KML vCopy_LookAt_KML, Copy LookAt KM&L
 ; Gui Add, Button, yp x0 hidden greload, reloa&d
 
-Gui, Add, Button, yp+35 x10 w40 h20 gSavePos vSavedPos1, 1
-Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos2, 2
-Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos3, 3
-Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos4, 4
-Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos5, 5
-Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos6, 6
-SavedPos1_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
-SavedPos2_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
-SavedPos3_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
-SavedPos4_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
-SavedPos5_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
-SavedPos6_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Alt and click to load a saved position without flying to it."
+Gui, Add, Button, yp+35 x10 w40 h20 gSavePos vSavedPos1, &1
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos2, &2
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos3, &3
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos4, &4
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos5, &5
+Gui, Add, Button, yp xp+48 w40 h20 gSavePos vSavedPos6, &6
+SavedPos1_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Ctrl and click to load a saved position without flying to it."
+SavedPos2_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Ctrl and click to load a saved position without flying to it."
+SavedPos3_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Ctrl and click to load a saved position without flying to it."
+SavedPos4_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Ctrl and click to load a saved position without flying to it."
+SavedPos5_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Ctrl and click to load a saved position without flying to it."
+SavedPos6_TT := "Click to load a previously saved position.`nPress Shift and click to save the current position.`nPress Ctrl and click to load a saved position without flying to it."
 Copy_LatLong_TT := "Copy Latitude and Longitude to the clipboard (separated by a tab) `n(hold down Shift to copy separated by a comma)"
 Copy_LatLong_KML_TT := "Copy Latitude and Longitude to the clipboard in KML format "
 Copy_LookAt_TT := "Copy LookAt parameters (current viewpoint) to the clipboard (tab separated) `n(hold down Shift to copy comma separated)"
@@ -145,6 +147,16 @@ Gui +LastFound
 If OnTop
 	WinSet AlwaysOnTop
 OnMessage(0x200, "WM_MOUSEMOVE")
+OnMessage(0x201, "WM_LBUTTONDOWN")
+
+WM_LBUTTONDOWN(wParam, lParam) {
+	PostMessage, 0xA1, 2		; move window
+    ; X := lParam & 0xFFFF
+    ; Y := lParam >> 16
+	; SB_SetText(A_GuiControl " " X " " Y)
+    ; if !A_GuiControl
+		; SB_SetText("xxx" A_GuiControl " " X " " Y)
+}
 
 Loop {
   Gui, Submit, NoHide
@@ -242,10 +254,9 @@ GetPos:
 	GuiControl,, Azimuth, %Azimuth%
   If (PointAltitude != oldPointAltitude)
 	GuiControl,, Altitude, %PointAltitude%
-  If (DMSCoord != oldDMSCoord) {
+  If (DMSCoord != oldDMSCoord and !freezeSB) {
 	SB_SetText("   DMS Coordinates:   " DMSCoord)
 	StatusBar_TT := "Double-click to copy the DMS coordinates"
-	;GuiControl,, DMSCoord, %DMSCoord%
   }
   GuiControl,, Speed, %Speed%
 return
@@ -256,22 +267,29 @@ return
 
 Copy_LatLong:
   GetKeyState, shiftstate, Shift
-  If (shiftstate = "D")
+  If (shiftstate = "D") {
 	clipboard = %FocusPointLatitude%, %FocusPointLongitude%
-  Else
+	SB_SetTextTime("  Coordinates copied (csv). ")
+  } else {
   	clipboard = %FocusPointLatitude%`t%FocusPointLongitude%
+	SB_SetTextTime("  Coordinates copied (tab). ")
+  }
 return
 
 Copy_LookAt:
   GetKeyState, shiftstate, Shift
-  If (shiftstate = "D")
+  If (shiftstate = "D") {
 	clipboard = %FocusPointLatitude%, %FocusPointLongitude%, %FocusPointAltitudeM%, %RangeM%, %Tilt%, %Azimuth%
-  Else
+	SB_SetTextTime("  LookAt parameters copied (csv). ")
+  } else {
 	clipboard = %FocusPointLatitude%`t%FocusPointLongitude%`t%FocusPointAltitudeM%`t%RangeM%`t%Tilt%`t%Azimuth%
+	SB_SetTextTime("  LookAt parameters copied (tab). ")
+  }
 return
 
 Copy_LatLong_KML:
 	clipboard = <coordinates>%FocusPointLongitude%,%FocusPointLatitude%,0</coordinates>
+	SB_SetTextTime("  KML coordinates copied. ")
 return
 
 Copy_LookAt_KML:
@@ -279,18 +297,21 @@ Copy_LookAt_KML:
   GetKeyState, shiftstate, Shift
   If (altstate = "D") {
 	clipboard = flyTo(%FocusPointLatitude%, %FocusPointLongitude%, %RangeM%, %Tilt%, %Azimuth%, "bounce", 2);`n
+	SB_SetTextTime("  flyTo() code copied. ")
   } Else If (shiftstate = "D") {
 	clipboard := "`t<gx:FlyTo>`n`t`t<gx:duration>5</gx:duration>`n`t`t<gx:flyToMode>bounce</gx:flyToMode>`n`t`t<LookAt>`n`t`t`t<longitude>" . FocusPointLongitude . "</longitude>`n`t`t`t<latitude>" . FocusPointLatitude . "</latitude>`n`t`t`t<altitude>" . FocusPointAltitudeM . "</altitude>`n`t`t`t<range>" . RangeM . "</range>`n`t`t`t<tilt>" . Tilt . "</tilt>`n`t`t`t<heading>" . Azimuth . "</heading>`n`t`t</LookAt>`n`t</gx:FlyTo>`n"
 	; clipboard = $kml .= flyTo(%FocusPointLatitude%, %FocusPointLongitude%, %RangeM%, %Tilt%, %Azimuth%, "bounce", 2);`n
+	SB_SetTextTime("  KML gx:FlyTo code copied. ")
   } Else {
 	clipboard := "`t<LookAt>`n`t`t<longitude>" . FocusPointLongitude . "</longitude>`n`t`t<latitude>" . FocusPointLatitude . "</latitude>`n`t`t<altitude>" . FocusPointAltitudeM . "</altitude>`n`t`t<range>" . RangeM . "</range>`n`t`t<tilt>" . Tilt . "</tilt>`n`t`t<heading>" . Azimuth . "</heading>`n`t</LookAt>`n"
+	SB_SetTextTime("  KML LookAt code copied. ")
   }
 return
 
 SavePos:
   GetKeyState, shiftstate, Shift
-  GetKeyState, altstate, Alt
-  If (shiftstate = "D" and altstate = "U") {
+  GetKeyState, ctrlstate, Ctrl
+  If (shiftstate = "D" and ctrlstate = "U") {
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLatitude, %FocusPointLatitude%
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLongitude, %FocusPointLongitude%
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointAltitude, %FocusPointAltitudeM%
@@ -298,12 +319,12 @@ SavePos:
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Range, %RangeM%
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Tilt, %Tilt%
 	RegWrite, REG_SZ, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Azimuth, %Azimuth%
-	SB_SetText("  Saved coordinates. ")
+	SB_SetTextTime("  Saved coordinates. ")
   } else if (shiftstate = "U") {
 	RegRead, FocusPointLatitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLatitude
 	IfEqual,FocusPointLatitude
 	{
-		SB_SetText(" No previously saved coordinates. Use Shift and click to save. ")
+		SB_SetTextTime(" No previously saved coordinates. Use Shift and click to save. ")
 		return
 	}
 	RegRead, FocusPointLongitude, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, FocusPointLongitude
@@ -316,11 +337,11 @@ SavePos:
 	RegRead, Azimuth, HKEY_CURRENT_USER, SOFTWARE\GoogleEarthPosition\%A_GuiControl%, Azimuth
 	FocusPointAltitude := FocusPointAltitudeM * UnitFactor
 	Range := RangeM * UnitFactor
-	If (altstate = "U") {
-		SB_SetText("  Coordinates loaded.")
+	If (ctrlstate = "U") {
+		SB_SetTextTime("  Coordinates loaded.")
 		Gosub, FlyTo
 	}
-	If (altstate = "D") {
+	If (ctrlstate = "D") {
 		GuiControl,, AutoLoad, 0
 		GuiControl,, FocusPointLatitude, %FocusPointLatitude%
 		GuiControl,, FocusPointLongitude, %FocusPointLongitude%
@@ -330,14 +351,31 @@ SavePos:
 		GuiControl,, Tilt, %Tilt%
 		GuiControl,, Azimuth, %Azimuth%
 		GuiControl,, Altitude, %PointAltitude%
+		DMSCoord := Dec2Deg(FocusPointLatitude "," FocusPointLongitude)
 		SB_SetText("   DMS Coordinates:   " DMSCoord)
 	}
   }
 return
 
 StatusBar:
-  If (A_GuiEvent = "DoubleClick")
-	clipboard := DMSCoord
+	If (A_GuiEvent = "DoubleClick") {
+		clipboard := DMSCoord
+		SB_SetTextTime("  DMS coordinates copied. ")
+	}
+return
+
+SB_SetTextTime(newtext, time=3000) {
+	global freezeSB
+	SB_SetText(newtext)
+	freezeSB = 1
+	SetTimer, ResetSB, %time%
+	return
+}
+
+ResetSB:
+	SB_SetText("   DMS Coordinates:   " DMSCoord)
+	freezeSB = 0
+	SetTimer, ResetSB, Off
 return
 
 WM_MOUSEMOVE() {
@@ -446,6 +484,10 @@ GuiClose:
   SaveWinPos("GoogleEarthPosition")
   WS_Uninitialize()
 ExitApp
+
+GuiEscape:
+	WinMinimize
+return
 
 SaveWinPos(HKCUswRegkey) {	; add SaveWinPos("my_program") in "GuiClose:" routine
   WinGetPos, X, Y, , , A  ; "A" to get the active window's pos.
