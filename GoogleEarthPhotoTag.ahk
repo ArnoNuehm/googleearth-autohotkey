@@ -22,6 +22,7 @@
 ; move photo up/down in list
 ; 
 ; Version history:
+; 1.27   -   add range+tilt+heading parameters to fly-to-photo command line (GoogleEarthPhotoTag.exe filename.jpg range tilt heading), fix photo path in kml (add "file:////"), fix placemark styles for GE5, click-window-to-drag
 ; 1.26   -   no code changes, fix icon, remove need for MSVCR71.dll
 ; 1.25   -   nothing new, up version number to release new executables of all tools without UPX compression (AV issues)
 ; 1.24   -   add new-version-check
@@ -44,8 +45,9 @@
 #NoEnv
 #SingleInstance off
 #NoTrayIcon 
+#Include %A_ScriptDir%
 #Include _libGoogleEarthCOM.ahk
-version = 1.26
+version = 1.27
 
 ; ------------ find exiv2.exe -----------
 EnvGet, EnvPath, Path
@@ -113,6 +115,9 @@ If 0 > 0
 		}
 	} else {		; use GoogleEarthPhotoTag.exe "c:\photos\DSC02083.JPG" to fly in Google Earth to the coordinates stored in this photo
 		filename = %1%
+		NewRange = %2%
+		NewTilt = %3%
+		NewHeading = %4%
 		If FileExist(filename) {
 			SplitPath filename, File, Folder, Ext
 			GetPhotoLatLongAlt(Folder "\" File, FileLatitude, FileLongitude, FileAltitude, exiv2path)
@@ -120,13 +125,17 @@ If 0 > 0
 				Msgbox,48, Read Coordinates, Error: No Exif GPS data in file: %filename% %FileLatitude%, %FileLongitude%
 			} else {
 				If IsGErunning() {
-					If (KeepAlt) {
+					If (KeepAlt and NewRange == "") {
 						GetGEpos(PointLatitude, PointLongitude, PointAltitude, AltitudeMode, NewRange, Tilt, Azimuth)	; needed just to have Range when flying to photo
-					} else {
-						NewRange := 10000
 					}
-					SetGEpos(FileLatitude, FileLongitude, 0, 1, NewRange, 0, 0)
-					Msgbox,, Read Coordinates, Locating coordinates %FileLatitude%`,%FileLongitude% in Google Earth..., 2
+					If (NewRange == "")
+						NewRange := 5000
+					If (NewTilt == "")
+						NewTilt := 0
+					If (NewHeading == "")
+						NewHeading := 0
+					SetGEpos(FileLatitude, FileLongitude, 0, 1, NewRange, NewTilt, NewHeading)
+					Msgbox,, Read Coordinates, Locating coordinates %FileLatitude%`,%FileLongitude% in Google Earth..., 1
 				} else {
 					Msgbox,48, Read Coordinates, Error: Google Earth is not running - cannot fly to coordinates %FileLatitude%`,%FileLongitude%.
 				}
@@ -255,6 +264,11 @@ Gui, +LastFound
 If OnTop
 	WinSet AlwaysOnTop
 GuiExpanded = 0
+OnMessage(0x201, "WM_LBUTTONDOWN")
+
+WM_LBUTTONDOWN(wParam, lParam) {
+	PostMessage, 0xA1, 2		; move window
+}
 
 ; ================================================================================ continous loop to track Google Earth coordinates ================================================================================
 Loop {
@@ -992,7 +1006,7 @@ KMLWrite:
 			<Data name="prev"><value>phototag%PrevID%</value></Data> 
 			<Data name="next"><value>phototag%NextID%</value></Data>
 			<Data name="FileName"><value><![CDATA[%File%]]></value></Data>
-			<Data name="FullPath"><value><![CDATA[%Folder%\%File%]]></value></Data>
+			<Data name="FullPath"><value><![CDATA[file:////%Folder%\%File%]]></value></Data>
 			<Data name="FileDescription"><value><![CDATA[%ListComment%]]></value></Data>
 			<Data name="PhotoWidth"><value>560</value></Data>
 		</ExtendedData>

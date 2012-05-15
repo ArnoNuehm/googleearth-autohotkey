@@ -10,31 +10,21 @@
 			<scale>0.7</scale>
 		</LabelStyle>
 		<BalloonStyle>
-			<bgColor>88292626</bgColor>
+			<bgColor>ff292626</bgColor>
 			<text><![CDATA[
-<center>
-<font color="#777777">$[FileName]</font><br><br>
-<table bgcolor="#000000" border="1" cellspacing="0" cellpadding="12">
-	<tr>
-		<td>
-			<center>
-				<img src="$[FullPath]" width="$[PhotoWidth]">
-			</center>
-		</td>
-	</tr>
-</table>
-<br>
-<font color="#dddddd">$[FileDescription]</font>
-<br><br>
-<div>
-	<table width="300"></table>
+<div style='background-color: #262629; text-align:center; margin: 0'>
+	<font color="#777777">$[FileName]</font>
+	<br>
+	<img src="$[FullPath]" width="$[PhotoWidth]" style='background-color: #000; padding: 12px; margin: 12px; border: 2px inset #fff'>
+	<br>
+	<font color="#dddddd">$[FileDescription]</font>
+	<br><br>
 	<a href="#$[prev];balloon"><font size='+1' color='#DDDDDD'><b>Previous Photo</b></font></a>
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 	<a href="#$[next];balloon"><font size='+1' color='#DDDDDD'><b>Next Photo</b></font></a>
 	<br><br>
-	<a href='http://code.google.com/p/googleearth-autohotkey/'><font color='#707070'>This kml was made with Google Earth PhotoTag</font></a>
+	<a href='http://code.google.com/p/googleearth-autohotkey/'><font size='-1' color='#707070'>This kml was made with Google Earth PhotoTag</font></a>
 </div>
-</center>
 			]]></text>
 		</BalloonStyle>
 	</Style>
